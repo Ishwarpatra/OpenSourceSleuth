@@ -1,0 +1,37 @@
+# Pre-commit configuration for SourceSleuth
+# See https://pre-commit.com for more information
+# See https://pre-commit.ci for CI integration
+
+repos:
+  # Basic file hygiene checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=5000'] # Prevents committing massive PDFs by accident
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Ruff - Python linter and formatter (replaces black, flake8, isort)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      # Run the formatter
+      - id: ruff-format
+
+# Pre-commit.ci configuration
+ci:
+  autofix_commit_msg: "ci: auto fixes from pre-commit.com hooks"
+  autoupdate_schedule: weekly
+  # Skip certain hooks on CI if needed
+  skip:
+    - no-commit-to-branch # Allow commits to any branch in CI

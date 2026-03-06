@@ -1,0 +1,138 @@
+# CodeRabbit Configuration for SourceSleuth
+# See https://docs.coderabbit.ai for more information
+
+# Language and tone settings
+language: "en-US"
+tone_instructions: |
+  Act as a senior Python engineer specializing in AI/ML systems and Model Context Protocol (MCP).
+  Focus heavily on:
+  - MCP best practices and protocol compliance
+  - Asynchronous performance and non-blocking I/O
+  - Local vector database (FAISS) efficiency and memory management
+  - Privacy-first architecture (no external API calls)
+
+  CRITICAL: Reject any PR that introduces network calls to external LLM APIs.
+  This is a strict local-first architecture. All embeddings and inference must run locally.
+
+# Chat configuration
+chat:
+  auto_reply: true
+  # Enable inline suggestions in PR conversations
+  inline_suggestions: true
+
+# Review configuration
+reviews:
+  # Use Python-specific review profile
+  profile: "python"
+
+  # Request changes as a workflow step (not just comments)
+  request_changes_workflow: true
+
+  # Include a high-level summary at the top of reviews
+  high_level_summary: true
+
+  # Disable poem (unprofessional for production codebases)
+  poem: false
+
+  # Show review status badges
+  review_status: true
+
+  # Don't collapse walkthrough sections
+  collapse_walkthrough: false
+
+  # Path-specific instructions for key files
+  path_instructions:
+    # MCP Server - critical for AI integration
+    - path: "src/mcp_server.py"
+      instructions: |
+        - Ensure all MCP tools have extensive docstrings - these act as system prompts for the Host LLM
+        - Verify @server.tool() decorators are properly registered
+        - Check that tool arguments have proper type hints and validation
+        - Flag any blocking I/O operations that should be async
+        - Ensure error messages are LLM-friendly for better user experience
+
+    # Vector Store - performance critical
+    - path: "src/vector_store.py"
+      instructions: |
+        - Flag any changes that increase memory bloat - vector indices must remain lightweight
+        - Verify FAISS index operations are efficient (no unnecessary copies)
+        - Check that embeddings are properly normalized before storage
+        - Ensure persistence logic handles edge cases (empty index, corruption)
+        - Look for opportunities to add batch operations
+
+    # PDF Processor - I/O bound
+    - path: "src/pdf_processor.py"
+      instructions: |
+        - Verify chunking logic preserves semantic meaning (500 tokens with 50 overlap)
+        - Check for proper error handling on malformed PDFs
+        - Flag any memory leaks from unclosed file handles
+        - Ensure page metadata is preserved for citation recovery
+
+    # Source Sleuth Core
+    - path: "src/source_sleuth.py"
+      instructions: |
+        - Verify cosine similarity calculations are numerically stable
+        - Check that search results are properly ranked and filtered
+        - Ensure the standalone class mirrors MCP server functionality
+
+    # Dataset Preprocessor
+    - path: "src/dataset_preprocessor.py"
+      instructions: |
+        - Verify arXiv API rate limiting is respected
+        - Check deduplication logic for papers
+        - Ensure LaTeX stripping doesn't corrupt mathematical content
+
+    # Tests
+    - path: "tests/*.py"
+      instructions: |
+        - New features MUST have corresponding tests
+        - Verify tests are deterministic (no network calls, fixed seeds)
+        - Check that fixtures are properly scoped
+        - Flag flaky tests or tests that depend on execution order
+
+    # Web UI
+    - path: "app.py"
+      instructions: |
+        - Verify Streamlit caching is used appropriately (@st.cache_resource)
+        - Check that UI doesn't block on long operations
+        - Ensure error messages are user-friendly
+
+# Labels configuration
+labels:
+  # Auto-label PRs based on changes
+  auto_label: true
+  label_mappings:
+    - label: "ai-ml"
+      patterns:
+        - "src/vector_store.py"
+        - "src/dataset_preprocessor.py"
+        - "MODEL_CARD.md"
+        - "EVALUATION.md"
+    - label: "mcp"
+      patterns:
+        - "src/mcp_server.py"
+    - label: "pdf-processing"
+      patterns:
+        - "src/pdf_processor.py"
+        - "src/ingest.py"
+    - label: "ui"
+      patterns:
+        - "app.py"
+    - label: "tests"
+      patterns:
+        - "tests/**/*"
+    - label: "documentation"
+      patterns:
+        - "**/*.md"
+        - "examples/**/*"
+
+# Knowledge base for better context
+knowledge_base:
+  # Reference key documentation
+  enabled: true
+  files:
+    - "README.md"
+    - "MODEL_CARD.md"
+    - "EVALUATION.md"
+    - "CONTRIBUTING.md"
+    - "ROADMAP.md"

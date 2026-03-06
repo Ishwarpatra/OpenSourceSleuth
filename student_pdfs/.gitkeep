@@ -1,0 +1,8 @@
+# Place your academic PDF files here.
+# SourceSleuth will extract, chunk, and embed them for semantic search.
+#
+# Example:
+#   student_pdfs/
+#   ├── vaswani2017_attention.pdf
+#   ├── devlin2019_bert.pdf
+#   └── brown2020_gpt3.pdf
