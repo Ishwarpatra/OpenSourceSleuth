@@ -550,8 +550,7 @@ with st.sidebar:
         "OCR Language",
         options=["eng", "fra", "deu", "spa", "ita", "por", "rus"],
         index=0,
-        disabled=not enable_ocr,
-        help="OCR language code. Note: Only English is available by default. "
+        help="OCR language code. Note: Only English ('eng') is installed by default. "
              "Other languages require manual installation of Tesseract language packs."
     )
     
