@@ -30,6 +30,13 @@ source .venv/bin/activate    # Linux/macOS
 pip install -e ".[dev,ui,ocr]"
 ```
 
+This installs:
+- **pytest** - Testing framework
+- **ruff** - Linting and formatting
+- **streamlit** - Web UI development
+- **nltk** - Query expansion
+- **pytesseract, pdf2image, Pillow** - OCR support
+
 ### 3. Install Pre-commit Hooks (Recommended)
 
 Pre-commit hooks automatically check your code for common issues before each commit:
@@ -82,7 +89,7 @@ Make sure all tests pass before making changes.
 3. **Make your changes** following the code style guidelines below.
 4. **Write tests** for any new functionality.
 5. **Run the tests**: `pytest -v`
-6. **Run the linter**: `ruff check src/ tests/`
+6. **Run the linter and formatter**: `ruff check src/ tests/ && ruff format src/ tests/ --check`
 7. **Commit** with a clear message: `git commit -m "feat: add DOCX ingestion support"` (see [Commit Messages](#commit-message-format)).
 8. **Push & open a Pull Request** against `main`.
 9. **Fill out the PR template** at [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
@@ -148,8 +155,7 @@ chore(deps): bump sentence-transformers to 3.1.0
 
 - [ ] Ensure your branch is up to date with `main`: `git pull origin main`
 - [ ] Run all tests: `pytest -v`
-- [ ] Run the linter: `ruff check src/ tests/`
-- [ ] Run the formatter: `ruff format src/ tests/ --check`
+- [ ] Run the linter and formatter: `ruff check src/ tests/ && ruff format src/ tests/ --check`
 - [ ] Update documentation if needed
 - [ ] Add tests for new functionality
 - [ ] Verify pre-commit hooks pass: `pre-commit run --all-files`
@@ -204,7 +210,7 @@ Reviewers will evaluate your PR based on:
 
 ## Code Style
 
-We use [Ruff](https://docs.astral.sh/ruff/) for all linting and formatting. Ruff replaces black, flake8, isort, and other tools with a single, fast linter.
+We use [Ruff](https://docs.astral.sh/ruff/) for all linting and formatting. Ruff is a fast Python linter and formatter that replaces black, flake8, isort, and other tools with a single tool.
 
 ### Configuration
 
