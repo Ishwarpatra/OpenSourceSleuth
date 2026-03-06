@@ -3,6 +3,9 @@ SourceSleuth Web UI — Streamlit Frontend.
 
 A premium, modern web interface for searching orphaned quotes across
 your academic PDFs using local semantic search.
+
+Deployment: Run with `streamlit run app.py --server.port 8501`
+Health Check: The app responds to GET requests at /healthz
 """
 
 import tempfile
@@ -19,6 +22,7 @@ from src.config import PDF_DIR, DATA_DIR, EMBEDDING_MODEL, TOP_K, MIN_SCORE, SEA
 # --- Page Configuration ---
 st.set_page_config(
     page_title="SourceSleuth | Citation Recovery",
+    page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -578,7 +582,7 @@ with st.sidebar:
             if get_composite_key(f.name) not in st.session_state.processed_files
         ]
         
-        if new_files and st.button("Process Uploaded PDFs", use_container_width=True):
+        if new_files and st.button("Process Uploaded PDFs", width="stretch"):
             with st.spinner("Processing PDFs ..."):
                 temp_dir = tempfile.mkdtemp()
                 saved_paths = []
@@ -628,12 +632,12 @@ with st.sidebar:
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Refresh", use_container_width=True):
+        if st.button("Refresh", width="stretch"):
             st.cache_resource.clear()
             st.rerun()
 
     with col2:
-        if st.button("Clear Index", use_container_width=True):
+        if st.button("Clear Index", width="stretch"):
             store = get_vector_store()
             store.clear()
             index_path = DATA_DIR / "sourcesleuth.index"
@@ -714,7 +718,7 @@ query = st.text_area(
 
 col1, col2, col3 = st.columns([2, 1, 2])
 with col2:
-    search_clicked = st.button("Find Sources", use_container_width=True)
+    search_clicked = st.button("Find Sources", width="stretch")
 
 # --- Results Section ---
 if search_clicked and query:
@@ -853,7 +857,7 @@ if stats["num_files"] > 0:
         "Filename": stats["ingested_files"],
         "Status": ["Indexed"] * len(stats["ingested_files"]),
     })
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 # --- Footer ---
 st.markdown("""
