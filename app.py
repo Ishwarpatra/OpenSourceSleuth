@@ -563,12 +563,20 @@ with st.sidebar:
     )
 
     # Initialize session state for tracking processed files
+    # Use composite key: filename + ocr settings to allow re-processing with different params
     if "processed_files" not in st.session_state:
-        st.session_state.processed_files = set()
+        st.session_state.processed_files = {}  # Dict: {composite_key: True}
 
     if uploaded_files:
-        # Filter to only new files that haven't been processed yet
-        new_files = [f for f in uploaded_files if f.name not in st.session_state.processed_files]
+        # Build composite keys for already processed files
+        def get_composite_key(filename: str) -> str:
+            return f"{filename}_ocr{enable_ocr}_lang{ocr_language}"
+        
+        # Filter to only files that haven't been processed with CURRENT settings
+        new_files = [
+            f for f in uploaded_files 
+            if get_composite_key(f.name) not in st.session_state.processed_files
+        ]
         
         if new_files and st.button("Process Uploaded PDFs", use_container_width=True):
             with st.spinner("Processing PDFs ..."):
@@ -598,9 +606,10 @@ with st.sidebar:
                         added = store.add_chunks(chunks)
                         store.save()
                         
-                        # Track processed files to prevent re-processing
+                        # Track processed files with composite key to allow re-processing
                         for f in new_files:
-                            st.session_state.processed_files.add(f.name)
+                            key = get_composite_key(f.name)
+                            st.session_state.processed_files[key] = True
                         
                         st.success(f"Added {added} chunks from {len(new_files)} PDF(s)")
                     else:
@@ -610,7 +619,7 @@ with st.sidebar:
                     st.error(f"Failed to process PDFs: {e}")
         
         elif not new_files:
-            st.info(f"All {len(uploaded_files)} uploaded file(s) have already been processed.")
+            st.info(f"All {len(uploaded_files)} uploaded file(s) have already been processed with current settings.")
 
     st.divider()
 
