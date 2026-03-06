@@ -1,0 +1,82 @@
+# Docker ignore file for SourceSleuth
+# Reduces image size by excluding unnecessary files
+
+# Git
+.git
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (should not be in container)
+.env
+.env.local
+.env.*.local
+
+# Data directories (mounted as volumes instead)
+data/
+student_pdfs/
+*.pdf
+*.index
+*_metadata.json
+
+# Logs
+*.log
+logs/
+
+# Documentation (not needed in runtime image)
+*.md
+!README.md
+docs/
+examples/
+
+# Testing
+tests/
+tox/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.pre-commit-config.yaml
+.github/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak

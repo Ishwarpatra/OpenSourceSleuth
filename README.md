@@ -115,10 +115,12 @@ MCP Host (Claude Desktop / Cursor / Windsurf)
 
 ### Prerequisites
 
-- **Python 3.10+**
+- **Python 3.10+** (or Docker for containerized deployment)
 - An MCP-compatible host (e.g., [Claude Desktop](https://claude.ai/desktop)) — optional
 
-### 1. Installation
+### Option 1: Local Python Installation
+
+#### 1. Installation
 
 ```bash
 git clone https://github.com/Ishwarpatra/OpenSourceSleuth.git
@@ -131,7 +133,7 @@ python -m venv .venv
 pip install -e ".[dev,ui]"
 ```
 
-### 2. Add Your PDFs
+#### 2. Add Your PDFs
 
 Drop your academic PDF files into the `student_pdfs/` directory:
 
@@ -142,10 +144,142 @@ student_pdfs/
 └── brown2020_gpt3.pdf
 ```
 
-### 3. Launch the Web UI
+#### 3. Launch the Web UI
 
 ```bash
 streamlit run app.py
+```
+
+Access the dashboard at [http://localhost:8501](http://localhost:8501) to search, upload PDFs, and view index statistics.
+
+---
+
+### Option 2: Docker Deployment (Recommended for Production)
+
+Docker provides a sandboxed environment that eliminates dependency conflicts and Python version issues. This is ideal for students who want a "just works" deployment.
+
+#### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running
+
+#### 1. Quick Setup (Automated)
+
+**Linux/macOS:**
+```bash
+bash scripts/docker_setup.sh
+```
+
+**Windows PowerShell:**
+```powershell
+.\scripts\docker_setup.ps1
+```
+
+This script will:
+- Build the Docker image
+- Create necessary volumes for persistent data
+- Test the container
+- Provide configuration instructions
+
+#### 2. Manual Docker Setup
+
+```bash
+# Build the image
+docker build -t sourcesleuth:latest .
+
+# Create volume for persistent data
+docker volume create sourcesleuth_vector_data
+
+# Test the container
+docker run --rm \
+  -v ./student_pdfs:/app/student_pdfs \
+  -v sourcesleuth_vector_data:/app/data \
+  sourcesleuth:latest \
+  python -c "print('Container ready!')"
+```
+
+#### 3. Configure MCP Host for Docker
+
+To use the Dockerized server with Claude Desktop, update your `claude_desktop_config.json`:
+
+**macOS/Linux:**
+```json
+{
+  "mcpServers": {
+    "sourcesleuth": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v", "/absolute/path/to/student_pdfs:/app/student_pdfs",
+        "-v", "sourcesleuth_vector_data:/app/data",
+        "sourcesleuth:latest"
+      ]
+    }
+  }
+}
+```
+
+**Windows:**
+```json
+{
+  "mcpServers": {
+    "sourcesleuth": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v", "C:\\path\\to\\student_pdfs:/app/student_pdfs",
+        "-v", "sourcesleuth_vector_data:/app/data",
+        "sourcesleuth:latest"
+      ]
+    }
+  }
+}
+```
+
+**Why this configuration is mandatory:**
+
+| Flag | Purpose |
+|------|---------|
+| `-i` | Keeps STDIN open for MCP stdio communication |
+| `--rm` | Cleans up container on exit (prevents orphaned containers) |
+| `-v ...:/app/student_pdfs` | Mounts your local PDFs into the container |
+| `-v sourcesleuth_vector_data:/app/data` | Named volume persists FAISS index between restarts |
+
+#### 4. Development with Docker Compose
+
+For testing and development (not for MCP Host integration):
+
+```bash
+# Build and start
+docker-compose up --build
+
+# Stop (data persists in volume)
+docker-compose down
+
+# View logs
+docker-compose logs -f
+```
+
+> **Note:** Docker Compose is for development testing only. For actual MCP Host integration, use the `docker run` configuration above.
+
+#### 5. Container Resource Limits
+
+The Docker container is configured with memory limits to prevent system resource exhaustion:
+
+- **Memory Limit:** 2GB maximum
+- **Memory Reservation:** 512MB minimum
+- **CPU:** Unrestricted (adjust in `docker-compose.yml` if needed)
+
+To customize limits, edit `docker-compose.yml`:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 4G  # Increase for large PDF collections
 ```
 
 Access the dashboard at [http://localhost:8501](http://localhost:8501) to search, upload PDFs, and view index statistics.
@@ -312,7 +446,7 @@ Found 3 potential match(es)!
 #1 — modern_physics_textbook.pdf  [HIGH - 0.87]
 ─────────────────────────────────────────────────────────────────
 "The photoelectric effect demonstrates that light behaves as discrete 
-packets of energy called photons, rather than purely as waves. This 
+packets of energy called photons, rather  than purely as waves. This 
 groundbreaking discovery by Einstein in 1905 established the quantum 
 nature of light..."
 

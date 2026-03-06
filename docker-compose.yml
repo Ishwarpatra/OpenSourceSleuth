@@ -1,0 +1,53 @@
+# Docker Compose for SourceSleuth Development
+#
+# This is for DEVELOPMENT ONLY - testing the containerized environment.
+# For production MCP usage, configure your MCP Host (Claude Desktop) to run
+# the container directly with proper stdio configuration.
+#
+# Usage:
+#   docker-compose up --build    # Build and start container
+#   docker-compose down          # Stop container (data persists in volume)
+#
+# WARNING: This does NOT work with MCP Hosts directly.
+# Use the docker run command in your MCP Host configuration instead.
+
+version: '3.8'
+
+services:
+  sourcesleuth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sourcesleuth:latest
+    
+    # Environment variables
+    environment:
+      - SOURCESLEUTH_PDF_DIR=/app/student_pdfs
+      - SOURCESLEUTH_DATA_DIR=/app/data
+      - SOURCESLEUTH_MODEL=all-MiniLM-L6-v2
+      - SOURCESLEUTH_LOG_LEVEL=INFO
+    
+    # Volumes for persistent storage
+    volumes:
+      # Mount local PDF directory (update path for your system)
+      - ./student_pdfs:/app/student_pdfs
+      # Named volume for vector store data
+      - sourcesleuth_vector_data:/app/data
+    
+    # Keep stdin open for interactive mode
+    stdin_open: true
+    tty: true
+    
+    # Resource limits to prevent memory exhaustion
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+# Named volumes
+volumes:
+  sourcesleuth_vector_data:
+    driver: local
+    name: sourcesleuth_vector_data
