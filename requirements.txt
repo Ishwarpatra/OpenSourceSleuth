@@ -5,6 +5,11 @@ PyMuPDF>=1.24.0
 faiss-cpu>=1.8.0
 numpy>=1.26.0
 scikit-learn>=1.4.0
+rank-bm25>=0.2.2
+
+# Web UI Dependencies
+streamlit>=1.30.0
+pandas>=2.0.0
 
 # Development Dependencies
 pytest>=8.0.0

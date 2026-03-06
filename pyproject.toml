@@ -31,6 +31,7 @@ dependencies = [
     "faiss-cpu>=1.8.0",
     "numpy>=1.26.0",
     "scikit-learn>=1.4.0",
+    "rank-bm25>=0.2.2",
 ]
 
 [project.optional-dependencies]
@@ -54,10 +55,85 @@ include = ["src*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+src = ["src", "tests"]
+
+# Exclude directories
+extend-exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "data",
+    "student_pdfs",
+    "build",
+    "dist",
+]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
+# Enable comprehensive linting rules
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort (import sorting)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade (modern Python syntax)
+    "B",      # flake8-bugbear (common bugs)
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "ARG",    # flake8-unused-arguments
+    "PTH",    # flake8-use-pathlib
+    "ICN",    # flake8-import-conventions
+    "RUF",    # Ruff-specific rules
+    "TCH",    # flake8-type-checking
+    "ANN",    # flake8-annotations (type hints)
+]
+
+# Ignore specific rules that are too strict
+ignore = [
+    "ANN101",  # Missing type annotation for self (not needed)
+    "ANN102",  # Missing type annotation for cls (not needed)
+    "PTH123",  # open() should be replaced by Path.open() (too aggressive)
+    "TCH001",  # Move application imports to type-checking block (not needed for MCP)
+    "TCH002",  # Move third-party imports to type-checking block (not needed for MCP)
+    "TCH003",  # Move standard library imports to type-checking block (not needed for MCP)
+]
+
+# Allow autofix for all enabled rules
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can have more relaxed rules
+"tests/**/*.py" = [
+    "ANN",     # Type hints not required in tests
+    "S101",    # assert is allowed in tests
+    "ARG",     # Unused fixtures are common in pytest
+]
+# MCP server can use more dynamic patterns
+"src/mcp_server.py" = [
+    "ARG",     # MCP tools may have unused parameters for extensibility
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+force-single-line = false
+lines-after-imports = 2
+
+[tool.ruff.lint.pyupgrade]
+# Preserve Python 3.10+ syntax
+keep-runtime-typing = false
+
+[tool.ruff.format]
+# Format configuration
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
