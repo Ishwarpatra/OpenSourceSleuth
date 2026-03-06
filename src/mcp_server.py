@@ -20,11 +20,11 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from src.config import PDF_DIR, DATA_DIR, EMBEDDING_MODEL
 from src.pdf_processor import (
     TextChunk,
     extract_text_from_pdf,
@@ -36,19 +36,9 @@ from src.dataset_preprocessor import (
     stream_arxiv_records,
 )
 
-# Logging
+# Logging (level configured centrally by src.config)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(name)-30s  %(levelname)-8s  %(message)s",
-)
 logger = logging.getLogger("sourcesleuth.server")
-
-# Configuration
-# Resolve paths relative to the project root (parent of `src/`)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PDF_DIR = Path(os.environ.get("SOURCESLEUTH_PDF_DIR", str(PROJECT_ROOT / "student_pdfs")))
-DATA_DIR = Path(os.environ.get("SOURCESLEUTH_DATA_DIR", str(PROJECT_ROOT / "data")))
 
 # Initialize MCP Server & Vector Store
 
@@ -60,7 +50,7 @@ mcp = FastMCP(
     ),
 )
 
-store = VectorStore(data_dir=DATA_DIR)
+store = VectorStore(model_name=EMBEDDING_MODEL, data_dir=DATA_DIR)
 
 # Attempt to load a previously persisted vector store on startup
 _loaded = store.load()
@@ -73,21 +63,38 @@ else:
 
 # MCP TOOLS
 @mcp.tool()
-def find_orphaned_quote(quote: str, top_k: int = 5) -> str:
+def find_orphaned_quote(
+    quote: str,
+    top_k: int = 5,
+    expanded_query: str = "",
+    search_mode: str = "hybrid",
+) -> str:
     """
     Find the original academic source for an orphaned quote or paraphrase.
 
-    Embeds the student's text and performs a cosine-similarity search
-    against all ingested PDF chunks to locate the most likely source
-    documents, pages, and surrounding context.
+    Uses hybrid search (FAISS dense retrieval + BM25 keyword matching +
+    Reciprocal Rank Fusion) to locate the most likely source documents,
+    pages, and surrounding context.
+
+    For best results with abstract/philosophical quotes, use the
+    ``expand_query`` prompt first to generate an expanded version of
+    the query with synonyms and domain concepts, then pass both the
+    original quote and the expanded form.
 
     Args:
         quote: The text or paraphrase the student wants to find a source for.
         top_k: Number of top matching results to return (default 5).
+        expanded_query: Optional LLM-expanded version of the quote containing
+                        synonyms, related concepts, and domain-specific
+                        keywords. If provided, this is used as the search
+                        query for better recall on abstract/philosophical text.
+        search_mode: Search strategy — 'hybrid' (default, FAISS+BM25+RRF),
+                     'dense' (FAISS only), or 'sparse' (BM25 only).
 
     Returns:
         A formatted string listing the most similar PDF chunks, including
-        the source filename, page number, confidence score, and context.
+        the source filename, page number, confidence score, context, and
+        any extracted metadata (title, authors) for citation purposes.
     """
     if store.total_chunks == 0:
         return (
@@ -96,7 +103,14 @@ def find_orphaned_quote(quote: str, top_k: int = 5) -> str:
             "academic papers, then try again."
         )
 
-    results = store.search(query=quote, top_k=top_k)
+    # Use expanded query if provided, otherwise use the raw quote
+    search_text = expanded_query.strip() if expanded_query.strip() else quote
+
+    results = store.search(
+        query=search_text,
+        top_k=top_k,
+        mode=search_mode,
+    )
 
     if not results:
         return "No matching sources found for the given text."
@@ -104,6 +118,11 @@ def find_orphaned_quote(quote: str, top_k: int = 5) -> str:
     response_parts = [
         f"**Found {len(results)} potential source(s)** for your quote:\n"
     ]
+
+    if expanded_query.strip():
+        response_parts.append(
+            f"*Search enhanced with expanded query.*\n"
+        )
 
     for i, result in enumerate(results, start=1):
         score = result["score"]
@@ -119,13 +138,34 @@ def find_orphaned_quote(quote: str, top_k: int = 5) -> str:
         if len(result["text"]) > 300:
             context_preview += " …"
 
+        rrf_note = ""
+        if "rrf_score" in result:
+            rrf_note = f"  (RRF: {result['rrf_score']})"
+
+        # Build metadata display if available
+        metadata_display = ""
+        if result.get("title"):
+            metadata_display += f"\n- **Title**: {result['title']}"
+        if result.get("authors"):
+            metadata_display += f"\n- **Author(s)**: {result['authors']}"
+        if result.get("creation_date"):
+            metadata_display += f"\n- **Date**: {result['creation_date']}"
+        if result.get("journal"):
+            metadata_display += f"\n- **Journal**: {result['journal']}"
+        if result.get("doi"):
+            metadata_display += f"\n- **DOI**: {result['doi']}"
+
+        if metadata_display:
+            metadata_display = f"\n**Extracted Metadata**:{metadata_display}"
+
         response_parts.append(
             f"### Match {i}\n"
             f"- **Document**: `{result['filename']}`\n"
             f"- **Page**: {result['page']}\n"
-            f"- **Confidence**: {badge} ({score})\n"
+            f"- **Confidence**: {badge} ({score}){rrf_note}\n"
             f"- **Context**:\n"
             f"  > {context_preview}\n"
+            f"{metadata_display}\n"
         )
 
     return "\n".join(response_parts)
@@ -335,38 +375,118 @@ def cite_recovered_source(
     source_filename: str,
     page_number: int,
     citation_style: str = "APA",
+    title: str = "",
+    authors: str = "",
+    creation_date: str = "",
+    publisher: str = "",
+    journal: str = "",
+    doi: str = "",
 ) -> str:
     """
     Format a recovered source into a proper academic citation.
 
-    This prompt instructs the LLM to take the raw recovery result and
-    produce a clean, correctly formatted citation in the requested style.
+    This prompt uses actual metadata extracted from the PDF during ingestion,
+    eliminating the need for the LLM to guess author/title from filenames.
+    
+    If metadata fields are empty (some PDFs lack proper metadata), the LLM
+    will indicate which fields need manual verification.
 
     Args:
         quote: The original orphaned quote from the student's paper.
         source_filename: The PDF filename where the source was found.
         page_number: The page number in the source document.
         citation_style: Citation format — "APA", "MLA", or "Chicago".
+        title: Document title extracted from PDF metadata.
+        authors: Author(s) extracted from PDF metadata.
+        creation_date: Publication/creation date from PDF metadata.
+        publisher: Publisher or creator from PDF metadata.
+        journal: Journal name from PDF metadata (if applicable).
+        doi: DOI from PDF metadata or text extraction (if available).
     """
+    # Build metadata context - only include fields that have actual values
+    metadata_lines = []
+    
+    if title.strip():
+        metadata_lines.append(f"- **Title**: {title}")
+    else:
+        metadata_lines.append("- **Title**: [Not found in PDF metadata - verify manually]")
+    
+    if authors.strip():
+        metadata_lines.append(f"- **Author(s)**: {authors}")
+    else:
+        metadata_lines.append("- **Author(s)**: [Not found in PDF metadata - verify manually]")
+    
+    if creation_date.strip():
+        metadata_lines.append(f"- **Date**: {creation_date}")
+    else:
+        metadata_lines.append("- **Date**: [Not found in PDF metadata - verify manually]")
+    
+    if journal.strip():
+        metadata_lines.append(f"- **Journal**: {journal}")
+    
+    if publisher.strip():
+        metadata_lines.append(f"- **Publisher**: {publisher}")
+    
+    if doi.strip():
+        metadata_lines.append(f"- **DOI**: {doi}")
+    
+    metadata_context = "\n".join(metadata_lines)
+    
     return (
         f"You are an expert academic citation assistant.\n\n"
         f"A student had the following orphaned quote in their paper:\n"
         f"  \"{quote}\"\n\n"
         f"Our citation recovery tool found this quote in the document "
         f"`{source_filename}` on page {page_number}.\n\n"
+        f"**Extracted Metadata from PDF**:\n"
+        f"{metadata_context}\n\n"
         f"Please do the following:\n"
-        f"1. Extract the likely author(s), title, publication year, and "
-        f"   publisher from the document filename and any context available.\n"
-        f"2. Format a complete **{citation_style}** citation.\n"
-        f"3. Also provide the correct in-text citation the student should "
-        f"   use in their paper.\n"
-        f"4. If you cannot determine all fields from the filename alone, "
-        f"   clearly indicate which fields need to be filled in manually "
-        f"   with placeholders like [Author Last Name].\n\n"
+        f"1. Use the extracted metadata above to format a complete **{citation_style}** citation.\n"
+        f"2. If any metadata fields are marked as missing, use placeholders like "
+        f"   [Author Last Name] and clearly indicate what needs manual verification.\n"
+        f"3. Provide the correct in-text citation the student should use in their paper.\n"
+        f"4. If the metadata is incomplete, suggest where the student might find "
+        f"   the missing information (e.g., first page of PDF, journal website).\n\n"
         f"Respond with:\n"
         f"- **Full Citation** (for the bibliography/works cited page)\n"
         f"- **In-Text Citation** (for use within the paper)\n"
         f"- **Notes** (any caveats or fields that need manual verification)"
+    )
+
+
+@mcp.prompt()
+def expand_query(quote: str) -> str:
+    """
+    Expand an orphaned quote with synonyms and domain concepts.
+
+    Use this prompt BEFORE calling find_orphaned_quote when the quote
+    is abstract, philosophical, or uses domain-specific language that
+    may not appear verbatim in the source material.
+
+    The LLM host will generate an expanded version of the query with
+    related terms, which can then be passed as the ``expanded_query``
+    argument to find_orphaned_quote for better retrieval.
+
+    Args:
+        quote: The original orphaned quote from the student's paper.
+    """
+    return (
+        f"You are a query expansion engine for academic source recovery.\n\n"
+        f"A student is searching for the original source of this text:\n"
+        f"  \"{quote}\"\n\n"
+        f"Generate an expanded search query by adding:\n"
+        f"1. Synonyms for key terms (e.g., 'utilizes' -> 'uses, employs')\n"
+        f"2. Related domain-specific concepts and terminology\n"
+        f"3. Named theories, theorems, or frameworks the quote might reference\n"
+        f"4. Author names commonly associated with these ideas\n"
+        f"5. Technical terms that might appear in the source material\n\n"
+        f"Return ONLY the expanded query as a single paragraph of keywords "
+        f"and phrases, suitable for semantic search. Do not explain or "
+        f"add commentary.\n\n"
+        f"Example — Input: 'nature loves symmetry'\n"
+        f"Output: 'nature symmetry physics conservation laws Noether theorem "
+        f"wave-particle duality quantum mechanics Heisenberg uncertainty "
+        f"principle mathematical symmetry group theory invariance'"
     )
 
 
@@ -377,6 +497,8 @@ def main():
     logger.info("Starting SourceSleuth MCP Server v1.0.0 …")
     logger.info("PDF directory : %s", PDF_DIR)
     logger.info("Data directory: %s", DATA_DIR)
+    logger.info("Embedding model: %s", store.model_name)
+    logger.info("Hybrid search : %s", store.get_stats().get("hybrid_search", False))
     mcp.run()
 
 

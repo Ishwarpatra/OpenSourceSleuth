@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,6 +16,17 @@ DEFAULT_CHUNK_SIZE = 500       # tokens (≈ 375 words)
 DEFAULT_CHUNK_OVERLAP = 50     # tokens overlap between consecutive chunks
 APPROX_CHARS_PER_TOKEN = 4    # rough estimate for English text
 
+# Sentence-window chunking defaults
+DEFAULT_SENTENCES_PER_WINDOW = 4   # group 3–5 sentences per chunk
+DEFAULT_SENTENCE_OVERLAP = 1       # 1-sentence overlap between windows
+
+# Regex-based sentence splitter (handles abbreviations, decimals, etc.)
+_SENTENCE_SPLIT_RE = re.compile(
+    r'(?<=[.!?])'            # lookbehind: sentence-ending punctuation
+    r'(?<!\b(?:Mr|Mrs|Ms|Dr|Prof|vs|e\.g|i\.e|etc|approx|al)\.)' # skip abbrevs
+    r'\s+'                    # require whitespace after punctuation
+)
+
 
 @dataclass
 class TextChunk:
@@ -26,6 +38,14 @@ class TextChunk:
     chunk_index: int   # position within the document
     start_char: int    # character offset in the full document text
     end_char: int      # character offset in the full document text
+    
+    # Document-level metadata extracted from PDF
+    title: str = ""
+    authors: str = ""
+    creation_date: str = ""
+    publisher: str = ""
+    journal: str = ""
+    doi: str = ""
 
     def to_dict(self) -> dict:
         """Serialize to dictionary for storage."""
@@ -36,6 +56,12 @@ class TextChunk:
             "chunk_index": self.chunk_index,
             "start_char": self.start_char,
             "end_char": self.end_char,
+            "title": self.title,
+            "authors": self.authors,
+            "creation_date": self.creation_date,
+            "publisher": self.publisher,
+            "journal": self.journal,
+            "doi": self.doi,
         }
 
     @classmethod
@@ -61,19 +87,69 @@ class PDFDocument:
     full_text: str
     page_spans: list[PageSpan] = field(default_factory=list)
     chunks: list[TextChunk] = field(default_factory=list)
+    
+    # Document-level metadata extracted from PDF metadata dictionary
+    title: str = ""
+    authors: str = ""
+    creation_date: str = ""
+    publisher: str = ""
+    journal: str = ""
+    doi: str = ""
+
+
+def _extract_pdf_metadata(doc: fitz.Document) -> dict:
+    """
+    Extract metadata from a PyMuPDF document object.
+    
+    PyMuPDF provides a metadata dictionary with keys like:
+    - title, author, subject, keywords
+    - creator, producer, creationDate, modDate
+    - format (PDF version), encryption
+    
+    Args:
+        doc: Open PyMuPDF document object.
+        
+    Returns:
+        Dictionary with extracted metadata fields.
+    """
+    try:
+        meta = doc.metadata
+    except Exception:
+        logger.warning("Could not extract metadata from PDF.")
+        return {}
+    
+    # Map PyMuPDF metadata keys to our schema
+    # Note: PyMuPDF uses 'author' (singular), but we store as 'authors'
+    extracted = {
+        "title": meta.get("title", "") or "",
+        "authors": meta.get("author", "") or "",
+        "creation_date": meta.get("creationDate", "") or "",
+        "publisher": meta.get("creator", "") or meta.get("producer", "") or "",
+        "journal": meta.get("subject", "") or "",  # Sometimes journal info is in subject
+        "doi": "",  # DOI typically not in PDF metadata, may need to extract from text
+    }
+    
+    # Clean up metadata - remove None values, strip whitespace
+    for key in extracted:
+        if extracted[key] is None:
+            extracted[key] = ""
+        else:
+            extracted[key] = str(extracted[key]).strip()
+    
+    return extracted
 
 
 # Extraction
 
 def extract_text_from_pdf(pdf_path: str | Path) -> PDFDocument:
     """
-    Extract all text from a PDF file, tracking per-page boundaries.
+    Extract all text from a PDF file, tracking per-page boundaries and metadata.
 
     Args:
         pdf_path: Absolute or relative path to the PDF file.
 
     Returns:
-        A PDFDocument with full_text and page_spans populated.
+        A PDFDocument with full_text, page_spans, and metadata populated.
 
     Raises:
         FileNotFoundError: If the PDF does not exist.
@@ -87,6 +163,9 @@ def extract_text_from_pdf(pdf_path: str | Path) -> PDFDocument:
         doc = fitz.open(str(pdf_path))
     except Exception as exc:
         raise RuntimeError(f"Failed to open PDF '{pdf_path.name}': {exc}") from exc
+
+    # Extract metadata first
+    metadata = _extract_pdf_metadata(doc)
 
     full_text_parts: list[str] = []
     page_spans: list[PageSpan] = []
@@ -121,6 +200,12 @@ def extract_text_from_pdf(pdf_path: str | Path) -> PDFDocument:
         filename=pdf_path.name,
         full_text=full_text,
         page_spans=page_spans,
+        title=metadata.get("title", ""),
+        authors=metadata.get("authors", ""),
+        creation_date=metadata.get("creation_date", ""),
+        publisher=metadata.get("publisher", ""),
+        journal=metadata.get("journal", ""),
+        doi=metadata.get("doi", ""),
     )
 
 
@@ -148,7 +233,7 @@ def chunk_text(
         chunk_overlap: Overlap between consecutive chunks in tokens.
 
     Returns:
-        A list of TextChunk objects.
+        A list of TextChunk objects with document metadata attached.
     """
     text = document.full_text
     if not text.strip():
@@ -176,6 +261,12 @@ def chunk_text(
                 chunk_index=idx,
                 start_char=start,
                 end_char=end,
+                title=document.title,
+                authors=document.authors,
+                creation_date=document.creation_date,
+                publisher=document.publisher,
+                journal=document.journal,
+                doi=document.doi,
             ))
             idx += 1
 
@@ -185,6 +276,109 @@ def chunk_text(
     logger.info(
         "Chunked '%s' into %d chunks (size=%d, overlap=%d tokens).",
         document.filename, len(chunks), chunk_size, chunk_overlap,
+    )
+    return chunks
+
+
+# Sentence-Window Chunking
+
+def _split_sentences(text: str) -> list[str]:
+    """
+    Split text into sentences using regex-based segmentation.
+
+    Handles common abbreviations (Mr., Dr., e.g., etc.) to avoid
+    false splits. Falls back to newline-based splitting if regex
+    produces fewer than 2 sentences.
+    """
+    sentences = _SENTENCE_SPLIT_RE.split(text)
+    # Filter out empty strings and strip whitespace
+    sentences = [s.strip() for s in sentences if s.strip()]
+
+    # Fallback: if we got very few sentences, try splitting on newlines
+    if len(sentences) < 2 and '\n' in text:
+        sentences = [s.strip() for s in text.split('\n') if s.strip()]
+
+    return sentences
+
+
+def chunk_text_by_sentences(
+    document: PDFDocument,
+    sentences_per_window: int = DEFAULT_SENTENCES_PER_WINDOW,
+    sentence_overlap: int = DEFAULT_SENTENCE_OVERLAP,
+) -> list[TextChunk]:
+    """
+    Split document text into overlapping sentence-window chunks.
+
+    Segments the text by sentence boundaries and groups them into
+    sliding windows. This prevents short, dense quotes from being
+    diluted by surrounding unrelated text (e.g., a 10-word quote
+    inside 500 tokens of math).
+
+    Args:
+        document: A previously extracted PDFDocument.
+        sentences_per_window: Number of sentences per chunk (default 4).
+        sentence_overlap: Number of overlapping sentences between
+            consecutive windows (default 1).
+
+    Returns:
+        A list of TextChunk objects with sentence-aligned boundaries
+        and document metadata attached.
+    """
+    text = document.full_text
+    if not text.strip():
+        logger.warning("Document '%s' has no extractable text.", document.filename)
+        return []
+
+    sentences = _split_sentences(text)
+    if not sentences:
+        logger.warning("Could not segment '%s' into sentences.", document.filename)
+        return []
+
+    stride = max(sentences_per_window - sentence_overlap, 1)
+    chunks: list[TextChunk] = []
+    idx = 0
+
+    for start_idx in range(0, len(sentences), stride):
+        end_idx = min(start_idx + sentences_per_window, len(sentences))
+        window_text = " ".join(sentences[start_idx:end_idx]).strip()
+
+        if not window_text:
+            continue
+
+        # Compute char offsets by finding this text in the full document
+        char_start = text.find(sentences[start_idx])
+        char_end_sent = sentences[end_idx - 1]
+        char_end = text.find(char_end_sent) + len(char_end_sent) if char_end_sent else char_start + len(window_text)
+        if char_start < 0:
+            char_start = 0
+        if char_end < char_start:
+            char_end = char_start + len(window_text)
+
+        page = _resolve_page(document.page_spans, max(char_start, 0))
+
+        chunks.append(TextChunk(
+            text=window_text,
+            filename=document.filename,
+            page=page,
+            chunk_index=idx,
+            start_char=char_start,
+            end_char=char_end,
+            title=document.title,
+            authors=document.authors,
+            creation_date=document.creation_date,
+            publisher=document.publisher,
+            journal=document.journal,
+            doi=document.doi,
+        ))
+        idx += 1
+
+        if end_idx >= len(sentences):
+            break
+
+    document.chunks = chunks
+    logger.info(
+        "Sentence-chunked '%s' into %d chunks (window=%d, overlap=%d sentences).",
+        document.filename, len(chunks), sentences_per_window, sentence_overlap,
     )
     return chunks
 
@@ -204,14 +398,17 @@ def process_pdf_directory(
     directory: str | Path,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    strategy: str = "sentence",
 ) -> list[TextChunk]:
     """
     Process all PDFs in a directory and return a flat list of chunks.
 
     Args:
         directory: Path to the directory containing PDF files.
-        chunk_size: Target chunk size in tokens.
-        chunk_overlap: Overlap in tokens.
+        chunk_size: Target chunk size in tokens (for 'fixed' strategy).
+        chunk_overlap: Overlap in tokens (for 'fixed' strategy).
+        strategy: Chunking strategy — 'sentence' (sentence-window,
+                  default) or 'fixed' (sliding character window).
 
     Returns:
         Flat list of TextChunk objects from all PDFs in the directory.
@@ -230,16 +427,20 @@ def process_pdf_directory(
     for pdf_path in pdf_files:
         try:
             document = extract_text_from_pdf(pdf_path)
-            chunks = chunk_text(document, chunk_size, chunk_overlap)
+            if strategy == "sentence":
+                chunks = chunk_text_by_sentences(document)
+            else:
+                chunks = chunk_text(document, chunk_size, chunk_overlap)
             all_chunks.extend(chunks)
             logger.info(
-                "Processed '%s' -> %d chunks", pdf_path.name, len(chunks),
+                "Processed '%s' -> %d chunks (strategy=%s)",
+                pdf_path.name, len(chunks), strategy,
             )
         except Exception as exc:
             logger.error("Failed to process '%s': %s", pdf_path.name, exc)
 
     logger.info(
-        "Total: processed %d PDFs -> %d chunks from '%s'.",
-        len(pdf_files), len(all_chunks), directory,
+        "Total: processed %d PDFs -> %d chunks from '%s' (strategy=%s).",
+        len(pdf_files), len(all_chunks), directory, strategy,
     )
     return all_chunks
