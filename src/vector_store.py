@@ -34,10 +34,8 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from pathlib import Path
-from typing import Optional
 
 import faiss
 import numpy as np
@@ -45,9 +43,11 @@ from sentence_transformers import SentenceTransformer
 
 from src.pdf_processor import TextChunk
 
+
 # Try to import filelock for multi-process safety
 try:
     from filelock import FileLock
+
     FILELOCK_AVAILABLE = True
 except ImportError:
     FILELOCK_AVAILABLE = False
@@ -59,6 +59,7 @@ logger = logging.getLogger("sourcesleuth.vector_store")
 
 # Model is configurable via .env file (loaded in src.config)
 from src.config import EMBEDDING_MODEL as DEFAULT_MODEL_NAME
+
 
 # Known embedding dimensions for common models (fallback: auto-detect)
 _KNOWN_DIMS = {
@@ -82,6 +83,7 @@ RRF_K = 60
 
 # BM25 Sparse Index
 
+
 class _BM25Index:
     """
     Lightweight BM25 sparse keyword index.
@@ -99,6 +101,7 @@ class _BM25Index:
 
         try:
             from rank_bm25 import BM25Okapi  # noqa: F401
+
             self._available = True
         except ImportError:
             logger.info(
@@ -109,7 +112,7 @@ class _BM25Index:
     @staticmethod
     def _tokenize(text: str) -> list[str]:
         """Simple whitespace + punctuation tokenizer for BM25."""
-        return re.findall(r'\b\w+\b', text.lower())
+        return re.findall(r"\b\w+\b", text.lower())
 
     def build(self, texts: list[str]) -> None:
         """Build the BM25 index from a list of text strings."""
@@ -154,6 +157,7 @@ class _BM25Index:
 
 # Reciprocal Rank Fusion
 
+
 def _reciprocal_rank_fusion(
     dense_ranking: list[tuple[int, float]],
     sparse_ranking: list[tuple[int, float]],
@@ -192,6 +196,7 @@ def _reciprocal_rank_fusion(
 
 # Vector Store Class
 
+
 class VectorStore:
     """
     FAISS-backed vector store with optional BM25 hybrid search.
@@ -219,7 +224,7 @@ class VectorStore:
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # Lazy-load the model to avoid slow startup when not needed
-        self._model: Optional[SentenceTransformer] = None
+        self._model: SentenceTransformer | None = None
         self._embedding_dim: int = _KNOWN_DIMS.get(model_name, EMBEDDING_DIM)
 
         # FAISS index — inner-product on L2-normalized vectors = cosine sim
@@ -248,7 +253,8 @@ class VectorStore:
             if test_dim and test_dim != self._embedding_dim:
                 logger.info(
                     "Auto-detected embedding dim=%d (was %d). Rebuilding index.",
-                    test_dim, self._embedding_dim,
+                    test_dim,
+                    self._embedding_dim,
                 )
                 self._embedding_dim = test_dim
                 # Rebuild FAISS index with correct dimensions if empty
@@ -298,7 +304,8 @@ class VectorStore:
 
         logger.info(
             "Added %d chunks to the vector store (total: %d).",
-            len(chunks), self._index.ntotal,
+            len(chunks),
+            self._index.ntotal,
         )
         return len(chunks)
 
@@ -356,9 +363,7 @@ class VectorStore:
         scores, indices = self._index.search(query_embedding, fetch_k)
 
         dense_ranking = [
-            (int(idx), float(score))
-            for score, idx in zip(scores[0], indices[0])
-            if idx >= 0
+            (int(idx), float(score)) for score, idx in zip(scores[0], indices[0], strict=False) if idx >= 0
         ]
 
         if mode == "dense" or not self._bm25.is_available:
@@ -394,13 +399,13 @@ class VectorStore:
     def save(self) -> None:
         """
         Persist the FAISS index and metadata to disk.
-        
+
         Uses file locking to prevent concurrent writes from multiple processes
         (e.g., MCP Server + Streamlit UI running simultaneously).
         """
         index_path = self.data_dir / INDEX_FILENAME
         meta_path = self.data_dir / METADATA_FILENAME
-        
+
         # Use file lock if available to prevent concurrent writes
         if FILELOCK_AVAILABLE and FileLock is not None:
             lock_path = self._get_lock_path()
@@ -434,15 +439,16 @@ class VectorStore:
 
         logger.info(
             "Saved vector store: %d vectors -> '%s'.",
-            self._index.ntotal, self.data_dir,
+            self._index.ntotal,
+            self.data_dir,
         )
 
     def load(self) -> bool:
         """
         Load a previously persisted vector store from disk.
-        
+
         Uses file locking to prevent reading during writes.
-        
+
         Returns:
             True if loaded successfully, False if no saved data was found.
         """
@@ -479,7 +485,8 @@ class VectorStore:
 
         logger.info(
             "Loaded vector store: %d vectors from '%s'.",
-            self._index.ntotal, self.data_dir,
+            self._index.ntotal,
+            self.data_dir,
         )
         return True
 
@@ -517,10 +524,7 @@ class VectorStore:
             return 0
 
         # Filter out chunks belonging to this file
-        keep_indices = [
-            i for i, m in enumerate(self._metadata)
-            if m["filename"] != filename
-        ]
+        keep_indices = [i for i, m in enumerate(self._metadata) if m["filename"] != filename]
         removed_count = len(self._metadata) - len(keep_indices)
 
         if not keep_indices:

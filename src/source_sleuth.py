@@ -32,11 +32,11 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+
 
 logger = logging.getLogger("sourcesleuth.core")
 
@@ -77,7 +77,7 @@ class SourceRetriever:
         self.model = SentenceTransformer(model_name)
         self.model_name = model_name
         self.document_chunks: list[dict] = []
-        self.document_embeddings: Optional[np.ndarray] = None
+        self.document_embeddings: np.ndarray | None = None
         logger.info("Model loaded successfully.")
 
     def ingest_documents(self, text_chunks: list[dict]) -> int:
@@ -117,9 +117,7 @@ class SourceRetriever:
             normalize_embeddings=True,
             batch_size=64,
         )
-        self.document_embeddings = np.asarray(
-            self.document_embeddings, dtype=np.float32
-        )
+        self.document_embeddings = np.asarray(self.document_embeddings, dtype=np.float32)
         logger.info("Ingestion complete: %d chunks embedded.", len(raw_texts))
         return len(raw_texts)
 
@@ -154,9 +152,7 @@ class SourceRetriever:
             RuntimeError: If no documents have been ingested yet.
         """
         if self.document_embeddings is None:
-            raise RuntimeError(
-                "No documents ingested. Call ingest_documents first."
-            )
+            raise RuntimeError("No documents ingested. Call ingest_documents first.")
 
         quote_embedding = self.model.encode(
             [orphaned_quote],
@@ -164,9 +160,7 @@ class SourceRetriever:
         )
         quote_embedding = np.asarray(quote_embedding, dtype=np.float32)
 
-        similarities = cosine_similarity(
-            quote_embedding, self.document_embeddings
-        )[0]
+        similarities = cosine_similarity(quote_embedding, self.document_embeddings)[0]
 
         # Get the indices of the highest similarity scores
         effective_k = min(top_k, len(self.document_chunks))

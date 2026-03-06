@@ -1,30 +1,30 @@
-
 from __future__ import annotations
 
 import json
 import logging
 import re
 import time
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterator, Optional
+
 
 logger = logging.getLogger("sourcesleuth.preprocessor")
 
 
 # Data Structures
 
+
 @dataclass
 class ArxivRecord:
-
     arxiv_id: str
     title: str
     authors: str
     abstract: str
     categories: str
-    doi: Optional[str] = None
-    journal_ref: Optional[str] = None
-    update_date: Optional[str] = None
+    doi: str | None = None
+    journal_ref: str | None = None
+    update_date: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -116,6 +116,7 @@ def format_authors(authors_parsed: list[list[str]] | None, authors_str: str) -> 
 
 # Streaming Reader
 
+
 def stream_arxiv_records(
     filepath: str | Path,
     categories_filter: set[str] | None = None,
@@ -150,7 +151,7 @@ def stream_arxiv_records(
     yielded = 0
     skipped = 0
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         for line_num, line in enumerate(f, start=1):
             line = line.strip()
             if not line:
@@ -171,19 +172,18 @@ def stream_arxiv_records(
                 if not record_cats.intersection(categories_filter):
                     continue
 
-            if category_prefix_filter:
+            if category_prefix_filter and not any(
+                cats.startswith(prefix) or f" {prefix}" in f" {cats}"
+                for prefix in category_prefix_filter
+            ):
+                # More robust: check each individual category
+                record_cats = cats.split()
                 if not any(
-                    cats.startswith(prefix) or f" {prefix}" in f" {cats}"
+                    cat.startswith(prefix)
+                    for cat in record_cats
                     for prefix in category_prefix_filter
                 ):
-                    # More robust: check each individual category
-                    record_cats = cats.split()
-                    if not any(
-                        cat.startswith(prefix)
-                        for cat in record_cats
-                        for prefix in category_prefix_filter
-                    ):
-                        continue
+                    continue
 
             update_date = raw.get("update_date", "")
             if start_date and update_date < start_date:
@@ -221,15 +221,19 @@ def stream_arxiv_records(
 
     logger.info(
         "Streaming complete: %d records yielded, %d skipped, %d lines read.",
-        yielded, skipped, line_num,
+        yielded,
+        skipped,
+        line_num,
     )
 
 
 # Preprocessing Pipeline
 
+
 @dataclass
 class PreprocessingStats:
     """Statistics from a preprocessing run."""
+
     total_input_lines: int = 0
     records_output: int = 0
     records_skipped: int = 0
@@ -237,9 +241,7 @@ class PreprocessingStats:
     elapsed_seconds: float = 0.0
 
     def summary(self) -> str:
-        top_cats = sorted(
-            self.categories_seen.items(), key=lambda x: -x[1]
-        )[:15]
+        top_cats = sorted(self.categories_seen.items(), key=lambda x: -x[1])[:15]
         cat_lines = "\n".join(f"    {cat}: {count:,}" for cat, count in top_cats)
         return (
             f"Preprocessing Summary\n"
@@ -295,7 +297,7 @@ def preprocess_dataset(
                 stats.categories_seen[cat] = stats.categories_seen.get(cat, 0) + 1
 
     # Count total input lines for stats
-    with open(input_path, "r", encoding="utf-8") as f:
+    with open(input_path, encoding="utf-8") as f:
         stats.total_input_lines = sum(1 for _ in f)
 
     stats.records_skipped = stats.total_input_lines - stats.records_output
@@ -307,7 +309,8 @@ def preprocess_dataset(
 
 # CLI Entry Point
 
-def main():
+
+def main() -> None:
     """Run the preprocessor from the command line."""
     import argparse
 
@@ -320,34 +323,40 @@ def main():
         description="Preprocess arXiv metadata for SourceSleuth.",
     )
     parser.add_argument(
-        "--input", "-i",
+        "--input",
+        "-i",
         default="data/arxiv-metadata-oai-snapshot.json",
         help="Path to raw arXiv JSON-Lines file.",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default="data/arxiv_preprocessed.jsonl",
         help="Path for cleaned output file.",
     )
     parser.add_argument(
-        "--categories", "-c",
+        "--categories",
+        "-c",
         nargs="*",
         default=None,
         help="Exact arXiv categories to include (e.g. cs.AI cs.CL).",
     )
     parser.add_argument(
-        "--category-prefix", "-p",
+        "--category-prefix",
+        "-p",
         nargs="*",
         default=None,
         help="Category prefixes to include (e.g. cs. stat. math.).",
     )
     parser.add_argument(
-        "--start-date", "-d",
+        "--start-date",
+        "-d",
         default=None,
         help="Only include records updated on/after this date (YYYY-MM-DD).",
     )
     parser.add_argument(
-        "--max-records", "-n",
+        "--max-records",
+        "-n",
         type=int,
         default=None,
         help="Maximum number of records to output.",

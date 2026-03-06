@@ -1,7 +1,6 @@
 """Tests for the dataset preprocessor module."""
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -11,8 +10,8 @@ from src.dataset_preprocessor import (
     clean_text,
     clean_title,
     format_authors,
-    stream_arxiv_records,
     preprocess_dataset,
+    stream_arxiv_records,
 )
 
 
@@ -81,6 +80,7 @@ def _write_sample_jsonl(path: Path, records: list[dict] | None = None):
 
 # Tests: Text Cleaning
 
+
 class TestCleanText:
     """Test the clean_text utility."""
 
@@ -142,6 +142,7 @@ class TestFormatAuthors:
 
 # Tests: Streaming Reader
 
+
 class TestStreamArxivRecords:
     """Test the streaming JSONL reader."""
 
@@ -202,6 +203,7 @@ class TestStreamArxivRecords:
 
 # Tests: Preprocessing Pipeline
 
+
 class TestPreprocessDataset:
     """Test the full preprocessing pipeline."""
 
@@ -216,7 +218,7 @@ class TestPreprocessDataset:
         assert output_path.exists()
 
         # Verify output is valid JSONL
-        with open(output_path, "r", encoding="utf-8") as f:
+        with open(output_path, encoding="utf-8") as f:
             lines = f.readlines()
         assert len(lines) == 3
         for line in lines:
@@ -241,6 +243,7 @@ class TestPreprocessDataset:
 
 
 # Tests: ArxivRecord
+
 
 class TestArxivRecord:
     """Test the ArxivRecord dataclass."""

@@ -25,10 +25,11 @@ import logging
 import sys
 from pathlib import Path
 
-from src.config import PDF_DIR, DATA_DIR, EMBEDDING_MODEL
-from src.vector_store import VectorStore
-from src.pdf_processor import process_pdf_directory
+from src.config import DATA_DIR, EMBEDDING_MODEL, PDF_DIR
 from src.dataset_preprocessor import preprocess_dataset, stream_arxiv_records
+from src.pdf_processor import process_pdf_directory
+from src.vector_store import VectorStore
+
 
 # Logging (level configured centrally by src.config)
 logger = logging.getLogger("sourcesleuth.ingest")
@@ -92,8 +93,9 @@ def cmd_ingest_arxiv(args: argparse.Namespace) -> int:
 
     preprocessed_path = DATA_DIR / "arxiv_preprocessed.jsonl"
 
-    logger.info("Preprocessing arXiv dataset (prefix=%s, max=%d)...",
-                args.category, args.max_records)
+    logger.info(
+        "Preprocessing arXiv dataset (prefix=%s, max=%d)...", args.category, args.max_records
+    )
 
     prefixes = {p.strip() for p in args.category.split(",") if p.strip()}
     stats = preprocess_dataset(
@@ -208,7 +210,8 @@ def main() -> int:
         help="Ingest PDFs from a directory",
     )
     pdf_parser.add_argument(
-        "-d", "--directory",
+        "-d",
+        "--directory",
         type=str,
         default="",
         help=f"Directory containing PDFs (default: {PDF_DIR})",
@@ -221,13 +224,15 @@ def main() -> int:
         help="Ingest arXiv paper abstracts",
     )
     arxiv_parser.add_argument(
-        "-c", "--category",
+        "-c",
+        "--category",
         type=str,
         default="cs.",
         help="arXiv category prefix (e.g., 'cs.', 'physics.')",
     )
     arxiv_parser.add_argument(
-        "-n", "--max-records",
+        "-n",
+        "--max-records",
         type=int,
         default=5000,
         help="Maximum number of records to ingest",

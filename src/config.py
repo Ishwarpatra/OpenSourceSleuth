@@ -20,6 +20,7 @@ import logging
 import os
 from pathlib import Path
 
+
 # ---------------------------------------------------------------------------
 # NLTK Data Initialization (Runtime Provisioning)
 # ---------------------------------------------------------------------------
@@ -29,30 +30,30 @@ NLTK_AVAILABLE = True
 
 # Map NLTK packages to their correct subdirectories
 _NLTK_PACKAGE_PATHS = {
-    'wordnet': 'corpora/wordnet',
-    'averaged_perceptron_tagger': 'taggers/averaged_perceptron_tagger',
-    'punkt': 'tokenizers/punkt',
-    'punkt_tab': 'tokenizers/punkt_tab',
-    'omw-1.4': 'corpora/omw-1.4',
+    "wordnet": "corpora/wordnet",
+    "averaged_perceptron_tagger": "taggers/averaged_perceptron_tagger",
+    "punkt": "tokenizers/punkt",
+    "punkt_tab": "tokenizers/punkt_tab",
+    "omw-1.4": "corpora/omw-1.4",
 }
 
 
 def _ensure_nltk_data() -> None:
     """
     Ensure NLTK corpora are available, downloading if missing.
-    
+
     This is critical for local installations where NLTK data hasn't been
     pre-downloaded. Docker/CI environments download data during build,
     but local pip installations need runtime provisioning.
-    
+
     Handles offline scenarios gracefully by logging warnings instead of crashing.
     Sets global NLTK_AVAILABLE flag to False if downloads fail.
     """
     global NLTK_AVAILABLE
-    
+
     try:
         import nltk
-        
+
         for package, path in _NLTK_PACKAGE_PATHS.items():
             try:
                 # Try to find the resource at its correct path
@@ -64,6 +65,7 @@ def _ensure_nltk_data() -> None:
                 except Exception as download_exc:
                     # Handle offline/network errors gracefully
                     import logging
+
                     logger = logging.getLogger("sourcesleuth.config")
                     logger.warning(
                         f"Failed to download NLTK package '{package}': {download_exc}. "
@@ -71,16 +73,18 @@ def _ensure_nltk_data() -> None:
                         f"To fix: run 'python -m nltk.downloader {package}' when online."
                     )
                     NLTK_AVAILABLE = False
-        
+
     except ImportError:
         # NLTK not installed - will fail later with clear error
         NLTK_AVAILABLE = False
     except Exception as exc:
         # Unexpected error during initialization
         import logging
+
         logger = logging.getLogger("sourcesleuth.config")
         logger.warning(f"NLTK initialization failed: {exc}. Query expansion disabled.")
         NLTK_AVAILABLE = False
+
 
 # Initialize NLTK data on module import
 _ensure_nltk_data()
@@ -104,16 +108,12 @@ if load_dotenv is not None:
 # PATH settings
 # ---------------------------------------------------------------------------
 
-PDF_DIR = Path(
-    os.environ.get("SOURCESLEUTH_PDF_DIR", str(PROJECT_ROOT / "student_pdfs"))
-)
+PDF_DIR = Path(os.environ.get("SOURCESLEUTH_PDF_DIR", str(PROJECT_ROOT / "student_pdfs")))
 # Make relative paths relative to project root
 if not PDF_DIR.is_absolute():
     PDF_DIR = PROJECT_ROOT / PDF_DIR
 
-DATA_DIR = Path(
-    os.environ.get("SOURCESLEUTH_DATA_DIR", str(PROJECT_ROOT / "data"))
-)
+DATA_DIR = Path(os.environ.get("SOURCESLEUTH_DATA_DIR", str(PROJECT_ROOT / "data")))
 if not DATA_DIR.is_absolute():
     DATA_DIR = PROJECT_ROOT / DATA_DIR
 
@@ -121,9 +121,7 @@ if not DATA_DIR.is_absolute():
 # MODEL settings
 # ---------------------------------------------------------------------------
 
-EMBEDDING_MODEL: str = os.environ.get(
-    "SOURCESLEUTH_EMBEDDING_MODEL", "all-MiniLM-L6-v2"
-)
+EMBEDDING_MODEL: str = os.environ.get("SOURCESLEUTH_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
 # ---------------------------------------------------------------------------
 # CHUNKING settings
@@ -148,9 +146,7 @@ SEARCH_MODE: str = os.environ.get("SOURCESLEUTH_SEARCH_MODE", "hybrid")
 # ARXIV settings
 # ---------------------------------------------------------------------------
 
-ARXIV_MAX_RECORDS: int = int(
-    os.environ.get("SOURCESLEUTH_ARXIV_MAX_RECORDS", "5000")
-)
+ARXIV_MAX_RECORDS: int = int(os.environ.get("SOURCESLEUTH_ARXIV_MAX_RECORDS", "5000"))
 
 # ---------------------------------------------------------------------------
 # LOGGING settings

@@ -1,69 +1,86 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import fitz  # PyMuPDF
 
+
 logger = logging.getLogger("sourcesleuth.pdf_processor")
 
 # Configuration
 
-DEFAULT_CHUNK_SIZE = 500       # tokens (≈ 375 words)
-DEFAULT_CHUNK_OVERLAP = 50     # tokens overlap between consecutive chunks
-APPROX_CHARS_PER_TOKEN = 4    # rough estimate for English text
+DEFAULT_CHUNK_SIZE = 500  # tokens (≈ 375 words)
+DEFAULT_CHUNK_OVERLAP = 50  # tokens overlap between consecutive chunks
+APPROX_CHARS_PER_TOKEN = 4  # rough estimate for English text
 
 # Sentence-window chunking defaults
-DEFAULT_SENTENCES_PER_WINDOW = 4   # group 3–5 sentences per chunk
-DEFAULT_SENTENCE_OVERLAP = 1       # 1-sentence overlap between windows
+DEFAULT_SENTENCES_PER_WINDOW = 4  # group 3–5 sentences per chunk
+DEFAULT_SENTENCE_OVERLAP = 1  # 1-sentence overlap between windows
 
 # Regex-based sentence splitter
 # Uses a simpler approach: split on sentence-ending punctuation followed by space
 # This avoids Python's fixed-width lookbehind requirement
-_SENTENCE_END_RE = re.compile(r'([.!?]+)\s+')
+_SENTENCE_END_RE = re.compile(r"([.!?]+)\s+")
 
 
 def _split_sentences(text: str) -> list[str]:
     """
     Split text into sentences using regex-based segmentation.
-    
+
     Handles common abbreviations by checking for known patterns.
     Falls back to newline-based splitting if regex produces fewer than 2 sentences.
-    
+
     Args:
         text: The text to split into sentences.
-        
+
     Returns:
         List of sentences.
     """
     # Common abbreviations that shouldn't end sentences
-    abbreviations = {'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sr', 'Jr', 'vs', 'etc', 'al', 
-                     'e.g', 'i.e', 'approx', 'Inc', 'Ltd', 'Corp', 'Co'}
-    
+    abbreviations = {
+        "Mr",
+        "Mrs",
+        "Ms",
+        "Dr",
+        "Prof",
+        "Sr",
+        "Jr",
+        "vs",
+        "etc",
+        "al",
+        "e.g",
+        "i.e",
+        "approx",
+        "Inc",
+        "Ltd",
+        "Corp",
+        "Co",
+    }
+
     # Split on sentence-ending punctuation, keeping the punctuation
     parts = _SENTENCE_END_RE.split(text)
-    
+
     # Reconstruct sentences (parts alternates between text and punctuation)
     sentences = []
     i = 0
     current_sentence = ""
-    
+
     while i < len(parts):
         part = parts[i].strip()
         if not part:
             i += 1
             continue
-            
+
         # Check if next part is punctuation
-        if i + 1 < len(parts) and parts[i + 1] in ['.', '!', '?']:
+        if i + 1 < len(parts) and parts[i + 1] in [".", "!", "?"]:
             punct = parts[i + 1]
             # Check if this might be an abbreviation (last word before punct)
             words = part.split()
-            last_word = words[-1].rstrip('.') if words else ""
-            
+            last_word = words[-1].rstrip(".") if words else ""
+
             if last_word in abbreviations:
                 # Abbreviation - continue building sentence
                 current_sentence += part + punct + " "
@@ -83,15 +100,15 @@ def _split_sentences(text: str) -> list[str]:
             # No punctuation, continue building sentence
             current_sentence += part + " "
             i += 1
-    
+
     # Add any remaining text
     if current_sentence.strip():
         sentences.append(current_sentence.strip())
-    
+
     # Fallback: if we got very few sentences, try splitting on newlines
-    if len(sentences) < 2 and '\n' in text:
-        sentences = [s.strip() for s in text.split('\n') if s.strip()]
-    
+    if len(sentences) < 2 and "\n" in text:
+        sentences = [s.strip() for s in text.split("\n") if s.strip()]
+
     return sentences
 
 
@@ -101,11 +118,11 @@ class TextChunk:
 
     text: str
     filename: str
-    page: int          # 1-indexed page number
-    chunk_index: int   # position within the document
-    start_char: int    # character offset in the full document text
-    end_char: int      # character offset in the full document text
-    
+    page: int  # 1-indexed page number
+    chunk_index: int  # position within the document
+    start_char: int  # character offset in the full document text
+    end_char: int  # character offset in the full document text
+
     # Document-level metadata extracted from PDF
     title: str = ""
     authors: str = ""
@@ -132,7 +149,7 @@ class TextChunk:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "TextChunk":
+    def from_dict(cls, data: dict) -> TextChunk:
         """Reconstruct from a dictionary."""
         return cls(**data)
 
@@ -141,7 +158,7 @@ class TextChunk:
 class PageSpan:
     """Tracks which page a character range belongs to."""
 
-    page: int          # 1-indexed
+    page: int  # 1-indexed
     start_char: int
     end_char: int
 
@@ -154,7 +171,7 @@ class PDFDocument:
     full_text: str
     page_spans: list[PageSpan] = field(default_factory=list)
     chunks: list[TextChunk] = field(default_factory=list)
-    
+
     # Document-level metadata extracted from PDF metadata dictionary
     title: str = ""
     authors: str = ""
@@ -167,15 +184,15 @@ class PDFDocument:
 def _extract_pdf_metadata(doc: fitz.Document) -> dict:
     """
     Extract metadata from a PyMuPDF document object.
-    
+
     PyMuPDF provides a metadata dictionary with keys like:
     - title, author, subject, keywords
     - creator, producer, creationDate, modDate
     - format (PDF version), encryption
-    
+
     Args:
         doc: Open PyMuPDF document object.
-        
+
     Returns:
         Dictionary with extracted metadata fields.
     """
@@ -184,7 +201,7 @@ def _extract_pdf_metadata(doc: fitz.Document) -> dict:
     except Exception:
         logger.warning("Could not extract metadata from PDF.")
         return {}
-    
+
     # Map PyMuPDF metadata keys to our schema
     # Note: PyMuPDF uses 'author' (singular), but we store as 'authors'
     extracted = {
@@ -195,18 +212,19 @@ def _extract_pdf_metadata(doc: fitz.Document) -> dict:
         "journal": meta.get("subject", "") or "",  # Sometimes journal info is in subject
         "doi": "",  # DOI typically not in PDF metadata, may need to extract from text
     }
-    
+
     # Clean up metadata - remove None values, strip whitespace
     for key in extracted:
         if extracted[key] is None:
             extracted[key] = ""
         else:
             extracted[key] = str(extracted[key]).strip()
-    
+
     return extracted
 
 
 # Extraction
+
 
 def extract_text_from_pdf(pdf_path: str | Path) -> PDFDocument:
     """
@@ -249,18 +267,22 @@ def extract_text_from_pdf(pdf_path: str | Path) -> PDFDocument:
         full_text_parts.append(page_text)
         current_offset += len(page_text)
 
-        page_spans.append(PageSpan(
-            page=page_num + 1,  # 1-indexed
-            start_char=start,
-            end_char=current_offset,
-        ))
+        page_spans.append(
+            PageSpan(
+                page=page_num + 1,  # 1-indexed
+                start_char=start,
+                end_char=current_offset,
+            )
+        )
 
     doc.close()
 
     full_text = "".join(full_text_parts)
     logger.info(
         "Extracted %d characters from %d pages of '%s'",
-        len(full_text), len(page_spans), pdf_path.name,
+        len(full_text),
+        len(page_spans),
+        pdf_path.name,
     )
 
     return PDFDocument(
@@ -277,6 +299,7 @@ def extract_text_from_pdf(pdf_path: str | Path) -> PDFDocument:
 
 
 # Chunking
+
 
 def _char_size(token_count: int) -> int:
     """Convert a token count to an approximate character count."""
@@ -321,20 +344,22 @@ def chunk_text(
 
         if chunk_text_str:
             page = _resolve_page(document.page_spans, start)
-            chunks.append(TextChunk(
-                text=chunk_text_str,
-                filename=document.filename,
-                page=page,
-                chunk_index=idx,
-                start_char=start,
-                end_char=end,
-                title=document.title,
-                authors=document.authors,
-                creation_date=document.creation_date,
-                publisher=document.publisher,
-                journal=document.journal,
-                doi=document.doi,
-            ))
+            chunks.append(
+                TextChunk(
+                    text=chunk_text_str,
+                    filename=document.filename,
+                    page=page,
+                    chunk_index=idx,
+                    start_char=start,
+                    end_char=end,
+                    title=document.title,
+                    authors=document.authors,
+                    creation_date=document.creation_date,
+                    publisher=document.publisher,
+                    journal=document.journal,
+                    doi=document.doi,
+                )
+            )
             idx += 1
 
         start += stride
@@ -342,12 +367,16 @@ def chunk_text(
     document.chunks = chunks
     logger.info(
         "Chunked '%s' into %d chunks (size=%d, overlap=%d tokens).",
-        document.filename, len(chunks), chunk_size, chunk_overlap,
+        document.filename,
+        len(chunks),
+        chunk_size,
+        chunk_overlap,
     )
     return chunks
 
 
 # Sentence-Window Chunking
+
 
 def chunk_text_by_sentences(
     document: PDFDocument,
@@ -396,7 +425,11 @@ def chunk_text_by_sentences(
         # Compute char offsets by finding this text in the full document
         char_start = text.find(sentences[start_idx])
         char_end_sent = sentences[end_idx - 1]
-        char_end = text.find(char_end_sent) + len(char_end_sent) if char_end_sent else char_start + len(window_text)
+        char_end = (
+            text.find(char_end_sent) + len(char_end_sent)
+            if char_end_sent
+            else char_start + len(window_text)
+        )
         if char_start < 0:
             char_start = 0
         if char_end < char_start:
@@ -404,20 +437,22 @@ def chunk_text_by_sentences(
 
         page = _resolve_page(document.page_spans, max(char_start, 0))
 
-        chunks.append(TextChunk(
-            text=window_text,
-            filename=document.filename,
-            page=page,
-            chunk_index=idx,
-            start_char=char_start,
-            end_char=char_end,
-            title=document.title,
-            authors=document.authors,
-            creation_date=document.creation_date,
-            publisher=document.publisher,
-            journal=document.journal,
-            doi=document.doi,
-        ))
+        chunks.append(
+            TextChunk(
+                text=window_text,
+                filename=document.filename,
+                page=page,
+                chunk_index=idx,
+                start_char=char_start,
+                end_char=char_end,
+                title=document.title,
+                authors=document.authors,
+                creation_date=document.creation_date,
+                publisher=document.publisher,
+                journal=document.journal,
+                doi=document.doi,
+            )
+        )
         idx += 1
 
         if end_idx >= len(sentences):
@@ -426,7 +461,10 @@ def chunk_text_by_sentences(
     document.chunks = chunks
     logger.info(
         "Sentence-chunked '%s' into %d chunks (window=%d, overlap=%d sentences).",
-        document.filename, len(chunks), sentences_per_window, sentence_overlap,
+        document.filename,
+        len(chunks),
+        sentences_per_window,
+        sentence_overlap,
     )
     return chunks
 
@@ -441,6 +479,7 @@ def _resolve_page(page_spans: list[PageSpan], char_offset: int) -> int:
 
 
 # Batch Processing
+
 
 def process_pdf_directory(
     directory: str | Path,
@@ -482,23 +521,25 @@ def process_pdf_directory(
         try:
             # Try standard extraction first
             document = extract_text_from_pdf(pdf_path)
-            
+
             # If no text extracted and OCR is enabled, try OCR
             if not document.full_text.strip() and use_ocr:
                 logger.info(
                     "No text found in '%s', attempting OCR (language: %s)...",
-                    pdf_path.name, ocr_language,
+                    pdf_path.name,
+                    ocr_language,
                 )
                 try:
                     from src.ocr_processor import process_pdf_with_ocr_fallback
-                    
+
                     ocr_text, used_ocr = process_pdf_with_ocr_fallback(
                         pdf_path, language=ocr_language
                     )
                     if used_ocr:
                         logger.info(
                             "OCR successful for '%s': %d chars extracted",
-                            pdf_path.name, len(ocr_text),
+                            pdf_path.name,
+                            len(ocr_text),
                         )
                         document.full_text = ocr_text
                     else:
@@ -510,25 +551,35 @@ def process_pdf_directory(
                 except Exception as ocr_exc:
                     logger.error(
                         "OCR failed for '%s': %s. Skipping.",
-                        pdf_path.name, ocr_exc,
+                        pdf_path.name,
+                        ocr_exc,
                     )
                     continue
-            
+
             if strategy == "sentence":
                 chunks = chunk_text_by_sentences(document)
             else:
                 chunks = chunk_text(document, chunk_size, chunk_overlap)
-            
+
             all_chunks.extend(chunks)
             logger.info(
                 "Processed '%s' -> %d chunks (strategy=%s, ocr=%s, lang=%s)",
-                pdf_path.name, len(chunks), strategy, use_ocr, ocr_language,
+                pdf_path.name,
+                len(chunks),
+                strategy,
+                use_ocr,
+                ocr_language,
             )
         except Exception as exc:
             logger.error("Failed to process '%s': %s", pdf_path.name, exc)
 
     logger.info(
         "Total: processed %d PDFs -> %d chunks from '%s' (strategy=%s, ocr=%s, lang=%s).",
-        len(pdf_files), len(all_chunks), directory, strategy, use_ocr, ocr_language,
+        len(pdf_files),
+        len(all_chunks),
+        directory,
+        strategy,
+        use_ocr,
+        ocr_language,
     )
     return all_chunks

@@ -1,8 +1,6 @@
 """Tests for the MCP Server tool functions."""
 
 import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
 
 from src.pdf_processor import TextChunk
 from src.vector_store import VectorStore
@@ -11,6 +9,7 @@ from src.vector_store import VectorStore
 # ---------------------------------------------------------------------------
 # Fixtures - Provide isolated test environments
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def vector_store(tmp_path):
@@ -25,6 +24,7 @@ def vector_store(tmp_path):
 def mock_mcp_store(monkeypatch, vector_store):
     """Patch the MCP server's global store with a fresh test instance."""
     import src.mcp_server
+
     monkeypatch.setattr(src.mcp_server, "store", vector_store)
     return vector_store
 
@@ -32,6 +32,7 @@ def mock_mcp_store(monkeypatch, vector_store):
 # ---------------------------------------------------------------------------
 # Tests: Tool Functions
 # ---------------------------------------------------------------------------
+
 
 class TestFindOrphanedQuote:
     """Test the find_orphaned_quote tool logic."""
@@ -126,9 +127,10 @@ class TestIngestPdfs:
     """Test the ingest_pdfs tool."""
 
     def test_ingest_basic(self, tmp_path, mock_mcp_store):
-        from src.mcp_server import ingest_pdfs
         import fitz
-        
+
+        from src.mcp_server import ingest_pdfs
+
         # Create a test PDF
         doc = fitz.open()
         doc.new_page()
@@ -136,21 +138,21 @@ class TestIngestPdfs:
         pdf_path = tmp_path / "test_ingest.pdf"
         doc.save(str(pdf_path))
         doc.close()
-        
+
         result = ingest_pdfs(directory=str(tmp_path), enable_ocr=False, ocr_language="eng")
-        
+
         assert "Ingestion complete" in result
         assert "test_ingest.pdf" in result
         assert "Chunks created" in result
 
     def test_ingest_directory_not_found(self, mock_mcp_store):
         from src.mcp_server import ingest_pdfs
-        
+
         result = ingest_pdfs(directory="/nonexistent/path", enable_ocr=False, ocr_language="eng")
         assert "Directory not found" in result
 
     def test_ingest_no_pdfs(self, tmp_path, mock_mcp_store):
         from src.mcp_server import ingest_pdfs
-        
+
         result = ingest_pdfs(directory=str(tmp_path), enable_ocr=False, ocr_language="eng")
         assert "No PDF files found" in result

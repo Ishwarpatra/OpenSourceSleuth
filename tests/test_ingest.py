@@ -3,23 +3,21 @@ Tests for the SourceSleuth CLI ingestion tool.
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
+
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.ingest import (
+    cmd_clear,
     cmd_ingest_pdfs,
     cmd_stats,
-    cmd_clear,
     main,
-    PDF_DIR,
-    DATA_DIR,
 )
 
 
@@ -116,7 +114,6 @@ class TestCLIArgumentParsing:
 
     def test_pdfs_arguments(self):
         """Test PDF subcommand argument parsing."""
-        from src.ingest import main
         import io
         from contextlib import redirect_stdout
 
@@ -129,7 +126,9 @@ class TestCLIArgumentParsing:
 
     def test_arxiv_arguments(self):
         """Test arXiv subcommand argument parsing."""
-        with patch.object(sys, "argv", ["sourcesleuth-ingest", "arxiv", "-c", "physics.", "-n", "1000"]):
+        with patch.object(
+            sys, "argv", ["sourcesleuth-ingest", "arxiv", "-c", "physics.", "-n", "1000"]
+        ):
             # Should not raise
             pass
 

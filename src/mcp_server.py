@@ -24,17 +24,18 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from src.config import PDF_DIR, DATA_DIR, EMBEDDING_MODEL
+from src.config import DATA_DIR, EMBEDDING_MODEL, PDF_DIR
+from src.dataset_preprocessor import (
+    preprocess_dataset,
+    stream_arxiv_records,
+)
 from src.pdf_processor import (
     TextChunk,
     extract_text_from_pdf,
     process_pdf_directory,
 )
 from src.vector_store import VectorStore
-from src.dataset_preprocessor import (
-    preprocess_dataset,
-    stream_arxiv_records,
-)
+
 
 # Logging (level configured centrally by src.config)
 
@@ -58,7 +59,6 @@ if _loaded:
     logger.info("Restored vector store with %d chunks.", store.total_chunks)
 else:
     logger.info("Starting with an empty vector store.")
-
 
 
 # MCP TOOLS
@@ -115,14 +115,10 @@ def find_orphaned_quote(
     if not results:
         return "No matching sources found for the given text."
 
-    response_parts = [
-        f"**Found {len(results)} potential source(s)** for your quote:\n"
-    ]
+    response_parts = [f"**Found {len(results)} potential source(s)** for your quote:\n"]
 
     if expanded_query.strip():
-        response_parts.append(
-            f"*Search enhanced with expanded query.*\n"
-        )
+        response_parts.append("*Search enhanced with expanded query.*\n")
 
     for i, result in enumerate(results, start=1):
         score = result["score"]
@@ -183,7 +179,7 @@ def ingest_pdfs(
     Extracts text from every PDF, splits it into 500-token chunks with
     50-token overlap, embeds each chunk using the all-MiniLM-L6-v2 model,
     and stores them in a FAISS index for fast similarity search.
-    
+
     For scanned PDFs (image-only), enable OCR support to extract text
     using Tesseract OCR.
 
@@ -196,14 +192,14 @@ def ingest_pdfs(
                     Install with: pip install sourcesleuth[ocr]
         ocr_language: Tesseract OCR language code (default: "eng" for English).
                       Use "eng+fra" for English+French, "eng+deu" for English+German.
-                      
+
                       IMPORTANT: The default Docker container only includes English
                       ("eng") training data. To use other languages, you must:
                       1. Install additional language packs on your system, OR
                       2. Rebuild the Docker container with additional tesseract-ocr-*
                          packages (e.g., tesseract-ocr-fra, tesseract-ocr-deu)
-                      
-                      Supported language codes: eng (English), fra (French), 
+
+                      Supported language codes: eng (English), fra (French),
                       deu (German), spa (Spanish), ita (Italian), por (Portuguese),
                       rus (Russian), chi_sim (Simplified Chinese), jpn (Japanese)
 
@@ -233,7 +229,7 @@ def ingest_pdfs(
     ocr_note = ""
     if enable_ocr:
         ocr_note = f" (with OCR, language: {ocr_language})"
-    
+
     return (
         f"**Ingestion complete!**{ocr_note}\n\n"
         f"- **PDFs processed**: {len(files_set)}\n"
@@ -309,7 +305,8 @@ def ingest_arxiv(
     preprocessed_path = DATA_DIR / "arxiv_preprocessed.jsonl"
     logger.info(
         "Preprocessing arXiv dataset (prefix=%s, max=%d) …",
-        category_prefix, max_records,
+        category_prefix,
+        max_records,
     )
 
     prefixes = {p.strip() for p in category_prefix.split(",") if p.strip()}
@@ -345,9 +342,7 @@ def ingest_arxiv(
     store.save()
 
     # Top categories from stats
-    top_cats = sorted(
-        stats.categories_seen.items(), key=lambda x: -x[1]
-    )[:10]
+    top_cats = sorted(stats.categories_seen.items(), key=lambda x: -x[1])[:10]
     cats_str = ", ".join(f"{cat} ({n})" for cat, n in top_cats)
 
     return (
@@ -364,6 +359,7 @@ def ingest_arxiv(
 
 
 # MCP RESOURCES
+
 
 @mcp.resource("sourcesleuth://pdfs/{filename}")
 def get_pdf_text(filename: str) -> str:
@@ -384,7 +380,7 @@ def get_pdf_text(filename: str) -> str:
     if not pdf_path.exists():
         return f"Error: PDF '{filename}' not found in {PDF_DIR}"
 
-    if not pdf_path.suffix.lower() == ".pdf":
+    if pdf_path.suffix.lower() != ".pdf":
         return f"Error: '{filename}' is not a PDF file."
 
     try:
@@ -413,7 +409,7 @@ def cite_recovered_source(
 
     This prompt uses actual metadata extracted from the PDF during ingestion,
     eliminating the need for the LLM to guess author/title from filenames.
-    
+
     If metadata fields are empty (some PDFs lack proper metadata), the LLM
     will indicate which fields need manual verification.
 
@@ -431,37 +427,37 @@ def cite_recovered_source(
     """
     # Build metadata context - only include fields that have actual values
     metadata_lines = []
-    
+
     if title.strip():
         metadata_lines.append(f"- **Title**: {title}")
     else:
         metadata_lines.append("- **Title**: [Not found in PDF metadata - verify manually]")
-    
+
     if authors.strip():
         metadata_lines.append(f"- **Author(s)**: {authors}")
     else:
         metadata_lines.append("- **Author(s)**: [Not found in PDF metadata - verify manually]")
-    
+
     if creation_date.strip():
         metadata_lines.append(f"- **Date**: {creation_date}")
     else:
         metadata_lines.append("- **Date**: [Not found in PDF metadata - verify manually]")
-    
+
     if journal.strip():
         metadata_lines.append(f"- **Journal**: {journal}")
-    
+
     if publisher.strip():
         metadata_lines.append(f"- **Publisher**: {publisher}")
-    
+
     if doi.strip():
         metadata_lines.append(f"- **DOI**: {doi}")
-    
+
     metadata_context = "\n".join(metadata_lines)
-    
+
     return (
         f"You are an expert academic citation assistant.\n\n"
         f"A student had the following orphaned quote in their paper:\n"
-        f"  \"{quote}\"\n\n"
+        f'  "{quote}"\n\n'
         f"Our citation recovery tool found this quote in the document "
         f"`{source_filename}` on page {page_number}.\n\n"
         f"**Extracted Metadata from PDF**:\n"
@@ -499,7 +495,7 @@ def expand_query(quote: str) -> str:
     return (
         f"You are a query expansion engine for academic source recovery.\n\n"
         f"A student is searching for the original source of this text:\n"
-        f"  \"{quote}\"\n\n"
+        f'  "{quote}"\n\n'
         f"Generate an expanded search query by adding:\n"
         f"1. Synonyms for key terms (e.g., 'utilizes' -> 'uses, employs')\n"
         f"2. Related domain-specific concepts and terminology\n"
@@ -518,7 +514,8 @@ def expand_query(quote: str) -> str:
 
 # Entry Point
 
-def main():
+
+def main() -> None:
     """Run the SourceSleuth MCP server over stdio."""
     logger.info("Starting SourceSleuth MCP Server v1.0.0 …")
     logger.info("PDF directory : %s", PDF_DIR)

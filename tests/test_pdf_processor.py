@@ -1,14 +1,12 @@
-
-import tempfile
 from pathlib import Path
 
-import fitz 
+import fitz
 import pytest
 
 from src.pdf_processor import (
     TextChunk,
-    extract_text_from_pdf,
     chunk_text,
+    extract_text_from_pdf,
     process_pdf_directory,
 )
 
@@ -45,7 +43,6 @@ def pdf_directory(tmp_path):
     _create_test_pdf(tmp_path / "paper_a.pdf", ["Content of paper A."])
     _create_test_pdf(tmp_path / "paper_b.pdf", ["Content of paper B."])
     return tmp_path
-
 
 
 class TestTextChunk:
@@ -117,7 +114,6 @@ class TestChunking:
         extracted = extract_text_from_pdf(pdf_path)
         chunks = chunk_text(extracted)
         assert chunks == []
-
 
 
 class TestBatchProcessing:

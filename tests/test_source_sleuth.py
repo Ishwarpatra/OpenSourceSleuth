@@ -17,31 +17,31 @@ def sample_documents():
     return [
         {
             "text": "Deep learning has revolutionized natural language processing "
-                    "with models like BERT and GPT achieving state-of-the-art results.",
+            "with models like BERT and GPT achieving state-of-the-art results.",
             "source": "nlp_survey.pdf",
             "page": 1,
         },
         {
             "text": "Convolutional neural networks apply learnable filters to detect "
-                    "local features in images, enabling high-accuracy classification.",
+            "local features in images, enabling high-accuracy classification.",
             "source": "cv_intro.pdf",
             "page": 3,
         },
         {
             "text": "Reinforcement learning enables agents to learn optimal policies "
-                    "through trial and error in complex environments.",
+            "through trial and error in complex environments.",
             "source": "rl_textbook.pdf",
             "page": 7,
         },
         {
             "text": "The attention mechanism allows the model to focus on specific "
-                    "parts of the input sequence that are most relevant to the output.",
+            "parts of the input sequence that are most relevant to the output.",
             "source": "transformer_paper.pdf",
             "page": 5,
         },
         {
             "text": "Wave interference produces a pattern of bright and dark fringes "
-                    "when coherent light passes through a double slit.",
+            "when coherent light passes through a double slit.",
             "source": "physics_101.pdf",
             "page": 42,
         },
@@ -106,9 +106,7 @@ class TestSearch:
         retriever.clear()
         retriever.ingest_documents(sample_documents)
 
-        results = retriever.find_source(
-            "double slit experiment light interference pattern"
-        )
+        results = retriever.find_source("double slit experiment light interference pattern")
         assert results[0]["source"] == "physics_101.pdf"
 
     def test_top_k_parameter(self, retriever, sample_documents):

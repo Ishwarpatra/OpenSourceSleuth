@@ -1,16 +1,13 @@
 """Tests for the Vector Store module."""
 
-import json
-from pathlib import Path
-
-import numpy as np
 import pytest
 
 from src.pdf_processor import TextChunk
-from src.vector_store import VectorStore, EMBEDDING_DIM
+from src.vector_store import EMBEDDING_DIM, VectorStore
 
 
 # Fixtures
+
 
 @pytest.fixture
 def store(tmp_path):
@@ -51,6 +48,7 @@ def sample_chunks():
 
 # Tests: Core Operations
 
+
 class TestVectorStoreCore:
     def test_add_chunks(self, store, sample_chunks):
         added = store.add_chunks(sample_chunks)
@@ -88,6 +86,7 @@ class TestVectorStoreCore:
 
 # Tests: Persistence
 
+
 class TestPersistence:
     def test_save_and_load(self, tmp_path, sample_chunks):
         data_dir = tmp_path / "persist_test"
@@ -111,6 +110,7 @@ class TestPersistence:
 
 
 # Tests: Utilities
+
 
 class TestUtilities:
     def test_clear(self, store, sample_chunks):
