@@ -5,27 +5,48 @@ from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 from src.pdf_processor import TextChunk
+from src.vector_store import VectorStore
 
 
-# Tests: Tool Functions (unit-test the logic directly)
+# ---------------------------------------------------------------------------
+# Fixtures - Provide isolated test environments
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def vector_store(tmp_path):
+    """Create a fresh VectorStore instance for each test."""
+    store = VectorStore(data_dir=tmp_path / "vector_data")
+    yield store
+    # Cleanup
+    store.clear()
+
+
+@pytest.fixture
+def mock_mcp_store(monkeypatch, vector_store):
+    """Patch the MCP server's global store with a fresh test instance."""
+    import src.mcp_server
+    monkeypatch.setattr(src.mcp_server, "store", vector_store)
+    return vector_store
+
+
+# ---------------------------------------------------------------------------
+# Tests: Tool Functions
+# ---------------------------------------------------------------------------
 
 class TestFindOrphanedQuote:
     """Test the find_orphaned_quote tool logic."""
 
-    def test_empty_store_returns_warning(self):
+    def test_empty_store_returns_warning(self, mock_mcp_store):
         """When no PDFs are ingested, should return a helpful message."""
-        from src.mcp_server import find_orphaned_quote, store
+        from src.mcp_server import find_orphaned_quote
 
-        # Ensure store is empty
-        store.clear()
         result = find_orphaned_quote("some random quote")
         assert "No PDFs have been ingested" in result
 
-    def test_search_with_data(self):
+    def test_search_with_data(self, mock_mcp_store):
         """When data is present, should return formatted results."""
-        from src.mcp_server import find_orphaned_quote, store
+        from src.mcp_server import find_orphaned_quote
 
-        store.clear()
         chunks = [
             TextChunk(
                 text="Machine learning is a subset of artificial intelligence.",
@@ -42,30 +63,25 @@ class TestFindOrphanedQuote:
                 doi="",
             ),
         ]
-        store.add_chunks(chunks)
+        mock_mcp_store.add_chunks(chunks)
 
         result = find_orphaned_quote("artificial intelligence and machine learning")
         assert "intro_to_ml.pdf" in result
         assert "Confidence" in result
 
-        # Cleanup
-        store.clear()
-
 
 class TestGetStoreStats:
     """Test the get_store_stats tool."""
 
-    def test_empty_stats(self):
-        from src.mcp_server import get_store_stats, store
+    def test_empty_stats(self, mock_mcp_store):
+        from src.mcp_server import get_store_stats
 
-        store.clear()
         result = get_store_stats()
         assert "Empty" in result
 
-    def test_stats_with_data(self):
-        from src.mcp_server import get_store_stats, store
+    def test_stats_with_data(self, mock_mcp_store):
+        from src.mcp_server import get_store_stats
 
-        store.clear()
         chunks = [
             TextChunk(
                 text="Test chunk content.",
@@ -82,12 +98,10 @@ class TestGetStoreStats:
                 doi="",
             ),
         ]
-        store.add_chunks(chunks)
+        mock_mcp_store.add_chunks(chunks)
         result = get_store_stats()
         assert "test.pdf" in result
         assert "all-MiniLM-L6-v2" in result
-
-        store.clear()
 
 
 class TestCiteRecoveredSource:
@@ -111,8 +125,8 @@ class TestCiteRecoveredSource:
 class TestIngestPdfs:
     """Test the ingest_pdfs tool."""
 
-    def test_ingest_basic(self, tmp_path):
-        from src.mcp_server import ingest_pdfs, store
+    def test_ingest_basic(self, tmp_path, mock_mcp_store):
+        from src.mcp_server import ingest_pdfs
         import fitz
         
         # Create a test PDF
@@ -123,22 +137,19 @@ class TestIngestPdfs:
         doc.save(str(pdf_path))
         doc.close()
         
-        store.clear()
         result = ingest_pdfs(directory=str(tmp_path), enable_ocr=False, ocr_language="eng")
         
         assert "Ingestion complete" in result
         assert "test_ingest.pdf" in result
         assert "Chunks created" in result
-        
-        store.clear()
 
-    def test_ingest_directory_not_found(self):
+    def test_ingest_directory_not_found(self, mock_mcp_store):
         from src.mcp_server import ingest_pdfs
         
         result = ingest_pdfs(directory="/nonexistent/path", enable_ocr=False, ocr_language="eng")
         assert "Directory not found" in result
 
-    def test_ingest_no_pdfs(self, tmp_path):
+    def test_ingest_no_pdfs(self, tmp_path, mock_mcp_store):
         from src.mcp_server import ingest_pdfs
         
         result = ingest_pdfs(directory=str(tmp_path), enable_ocr=False, ocr_language="eng")

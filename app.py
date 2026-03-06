@@ -531,6 +531,28 @@ with st.sidebar:
 
     st.divider()
 
+    # OCR Settings
+    st.markdown("### OCR Settings")
+    st.caption("For scanned documents")
+    
+    enable_ocr = st.checkbox(
+        "Enable OCR for scanned PDFs",
+        value=False,
+        help="Enable OCR (Optical Character Recognition) for scanned documents. "
+             "Slower processing but extracts text from image-only PDFs."
+    )
+    
+    ocr_language = st.selectbox(
+        "OCR Language",
+        options=["eng", "fra", "deu", "spa", "ita", "por", "rus"],
+        index=0,
+        disabled=not enable_ocr,
+        help="OCR language code. Note: Only English is available by default. "
+             "Other languages require manual installation of Tesseract language packs."
+    )
+    
+    st.divider()
+
     # File upload section
     st.markdown("### Upload PDFs")
     uploaded_files = st.file_uploader(
@@ -558,7 +580,26 @@ with st.sidebar:
                         # Lazy import to avoid loading PyMuPDF unnecessarily
                         from src.pdf_processor import chunk_text, extract_text_from_pdf
                         
+                        # Try standard extraction first
                         doc = extract_text_from_pdf(pdf_path)
+                        
+                        # If no text and OCR enabled, try OCR fallback
+                        if not doc.full_text.strip() and enable_ocr:
+                            st.info(f"Attempting OCR for {pdf_path.name} (language: {ocr_language})...")
+                            try:
+                                from src.ocr_processor import process_pdf_with_ocr_fallback
+                                ocr_text, used_ocr = process_pdf_with_ocr_fallback(
+                                    pdf_path, language=ocr_language
+                                )
+                                if used_ocr:
+                                    doc.full_text = ocr_text
+                                else:
+                                    st.warning(f"OCR failed for {pdf_path.name}, skipping.")
+                                    continue
+                            except Exception as ocr_exc:
+                                st.error(f"OCR error for {pdf_path.name}: {ocr_exc}")
+                                continue
+                        
                         doc_chunks = chunk_text(doc)
                         chunks.extend(doc_chunks)
                     except Exception as e:
