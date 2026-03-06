@@ -1,3 +1,0 @@
-[console_scripts]
-sourcesleuth = src.mcp_server:main
-sourcesleuth-ingest = src.ingest:main
