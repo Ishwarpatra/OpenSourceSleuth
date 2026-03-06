@@ -133,8 +133,8 @@ class TestIngestPdfs:
 
         # Create a test PDF
         doc = fitz.open()
-        doc.new_page()
-        doc.insert_text(fitz.Point(72, 72), "Test content for ingestion.", fontsize=11)
+        page = doc.new_page()
+        page.insert_text((72, 72), "Test content for ingestion.", fontsize=11)
         pdf_path = tmp_path / "test_ingest.pdf"
         doc.save(str(pdf_path))
         doc.close()
