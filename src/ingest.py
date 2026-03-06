@@ -22,25 +22,16 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 
+from src.config import PDF_DIR, DATA_DIR, EMBEDDING_MODEL
 from src.vector_store import VectorStore
 from src.pdf_processor import process_pdf_directory
 from src.dataset_preprocessor import preprocess_dataset, stream_arxiv_records
 
-# Logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(name)-30s  %(levelname)-8s  %(message)s",
-)
+# Logging (level configured centrally by src.config)
 logger = logging.getLogger("sourcesleuth.ingest")
-
-# Configuration from environment
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PDF_DIR = Path(os.environ.get("SOURCESLEUTH_PDF_DIR", str(PROJECT_ROOT / "student_pdfs")))
-DATA_DIR = Path(os.environ.get("SOURCESLEUTH_DATA_DIR", str(PROJECT_ROOT / "data")))
 
 
 def cmd_ingest_pdfs(args: argparse.Namespace) -> int:
@@ -59,7 +50,7 @@ def cmd_ingest_pdfs(args: argparse.Namespace) -> int:
     logger.info("Found %d PDF(s) to ingest.", len(pdf_files))
 
     # Initialize vector store
-    store = VectorStore(data_dir=DATA_DIR)
+    store = VectorStore(model_name=EMBEDDING_MODEL, data_dir=DATA_DIR)
 
     # Optionally load existing store
     if store.load():
@@ -113,7 +104,7 @@ def cmd_ingest_arxiv(args: argparse.Namespace) -> int:
     )
 
     # Initialize vector store
-    store = VectorStore(data_dir=DATA_DIR)
+    store = VectorStore(model_name=EMBEDDING_MODEL, data_dir=DATA_DIR)
     if store.load():
         logger.info("Loaded existing vector store (%d chunks).", store.total_chunks)
 
@@ -159,7 +150,7 @@ def cmd_ingest_arxiv(args: argparse.Namespace) -> int:
 
 def cmd_stats(args: argparse.Namespace) -> int:
     """Display vector store statistics."""
-    store = VectorStore(data_dir=DATA_DIR)
+    store = VectorStore(model_name=EMBEDDING_MODEL, data_dir=DATA_DIR)
 
     if not store.load():
         logger.info("Vector store is empty. Use 'ingest pdfs' to add documents.")
@@ -185,7 +176,7 @@ def cmd_stats(args: argparse.Namespace) -> int:
 
 def cmd_clear(args: argparse.Namespace) -> int:
     """Clear the vector store."""
-    store = VectorStore(data_dir=DATA_DIR)
+    store = VectorStore(model_name=EMBEDDING_MODEL, data_dir=DATA_DIR)
 
     if store.load():
         store.clear()
