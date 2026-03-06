@@ -27,6 +27,10 @@ env/
 ENV/
 .venv
 
+# Environment configuration
+.env
+.env.local
+
 # IDE
 .vscode/
 .idea/
