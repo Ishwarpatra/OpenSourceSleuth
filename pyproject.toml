@@ -32,6 +32,7 @@ dependencies = [
     "numpy>=1.26.0",
     "scikit-learn>=1.4.0",
     "rank-bm25>=0.2.2",
+    "filelock>=3.13.0",  # Multi-process file locking for FAISS safety
 ]
 
 [project.optional-dependencies]

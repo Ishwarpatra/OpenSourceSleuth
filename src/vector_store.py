@@ -45,6 +45,14 @@ from sentence_transformers import SentenceTransformer
 
 from src.pdf_processor import TextChunk
 
+# Try to import filelock for multi-process safety
+try:
+    from filelock import FileLock
+    FILELOCK_AVAILABLE = True
+except ImportError:
+    FILELOCK_AVAILABLE = False
+    FileLock = None  # type: ignore
+
 logger = logging.getLogger("sourcesleuth.vector_store")
 
 # Configuration
@@ -379,20 +387,50 @@ class VectorStore:
 
     # Persistence
 
+    def _get_lock_path(self) -> Path:
+        """Get the path for the file lock."""
+        return self.data_dir / "sourcesleuth.lock"
+
     def save(self) -> None:
-        """Persist the FAISS index and metadata to disk."""
+        """
+        Persist the FAISS index and metadata to disk.
+        
+        Uses file locking to prevent concurrent writes from multiple processes
+        (e.g., MCP Server + Streamlit UI running simultaneously).
+        """
         index_path = self.data_dir / INDEX_FILENAME
         meta_path = self.data_dir / METADATA_FILENAME
+        
+        # Use file lock if available to prevent concurrent writes
+        if FILELOCK_AVAILABLE and FileLock is not None:
+            lock_path = self._get_lock_path()
+            lock = FileLock(lock_path, timeout=30)
+            with lock:
+                faiss.write_index(self._index, str(index_path))
 
-        faiss.write_index(self._index, str(index_path))
+                payload = {
+                    "model_name": self.model_name,
+                    "embedding_dim": self._embedding_dim,
+                    "ingested_files": sorted(self._ingested_files),
+                    "chunks": self._metadata,
+                }
+                meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        else:
+            # No filelock - proceed without locking (may cause corruption)
+            if not FILELOCK_AVAILABLE:
+                logger.warning(
+                    "filelock not installed - concurrent writes may corrupt index. "
+                    "Install with: pip install filelock"
+                )
+            faiss.write_index(self._index, str(index_path))
 
-        payload = {
-            "model_name": self.model_name,
-            "embedding_dim": self._embedding_dim,
-            "ingested_files": sorted(self._ingested_files),
-            "chunks": self._metadata,
-        }
-        meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            payload = {
+                "model_name": self.model_name,
+                "embedding_dim": self._embedding_dim,
+                "ingested_files": sorted(self._ingested_files),
+                "chunks": self._metadata,
+            }
+            meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
         logger.info(
             "Saved vector store: %d vectors -> '%s'.",
@@ -402,7 +440,9 @@ class VectorStore:
     def load(self) -> bool:
         """
         Load a previously persisted vector store from disk.
-
+        
+        Uses file locking to prevent reading during writes.
+        
         Returns:
             True if loaded successfully, False if no saved data was found.
         """
@@ -413,12 +453,25 @@ class VectorStore:
             logger.info("No saved vector store found at '%s'.", self.data_dir)
             return False
 
-        self._index = faiss.read_index(str(index_path))
+        # Use file lock if available
+        if FILELOCK_AVAILABLE and FileLock is not None:
+            lock_path = self._get_lock_path()
+            lock = FileLock(lock_path, timeout=30)
+            with lock:
+                self._index = faiss.read_index(str(index_path))
 
-        payload = json.loads(meta_path.read_text(encoding="utf-8"))
-        self._metadata = payload.get("chunks", [])
-        self._ingested_files = set(payload.get("ingested_files", []))
-        self._embedding_dim = payload.get("embedding_dim", EMBEDDING_DIM)
+                payload = json.loads(meta_path.read_text(encoding="utf-8"))
+                self._metadata = payload.get("chunks", [])
+                self._ingested_files = set(payload.get("ingested_files", []))
+                self._embedding_dim = payload.get("embedding_dim", EMBEDDING_DIM)
+        else:
+            # No filelock - proceed without locking
+            self._index = faiss.read_index(str(index_path))
+
+            payload = json.loads(meta_path.read_text(encoding="utf-8"))
+            self._metadata = payload.get("chunks", [])
+            self._ingested_files = set(payload.get("ingested_files", []))
+            self._embedding_dim = payload.get("embedding_dim", EMBEDDING_DIM)
 
         # Rebuild BM25 index from loaded metadata
         all_texts = [m["text"] for m in self._metadata]
