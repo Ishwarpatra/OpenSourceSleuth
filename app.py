@@ -72,7 +72,7 @@ def expand_query_keywords(query: str, max_synonyms: int = 2) -> list[str]:
     # Lazy import NLTK only when expansion is needed
     try:
         from nltk.corpus import wordnet as wn
-        from nltk import pos_tag
+        from nltk import pos_tag, word_tokenize
         import nltk
         
         # Download NLTK data on first run (cached locally)
@@ -90,18 +90,20 @@ def expand_query_keywords(query: str, max_synonyms: int = 2) -> list[str]:
     
     # Tokenize and POS tag
     try:
-        tokens = nltk.word_tokenize(query)
+        tokens = word_tokenize(query)
         tagged = pos_tag(tokens)
     except Exception:
         # Fallback if tokenization fails
         return [query]
     
-    # Extract content words (nouns, verbs, adjectives) with POS
+    # Extract content words (nouns, verbs, adjectives) with POS and INDEX
+    # Store index to enable precise token replacement
     content_words = []
-    for word, tag in tagged:
+    for idx, (word, tag) in enumerate(tagged):
         pos = _get_wordnet_pos(tag)
-        if pos and len(word) > 2:
-            content_words.append((word.lower(), pos))
+        # Only process content words: has POS tag, length > 2, is alphabetic
+        if pos and len(word) > 2 and word.isalpha():
+            content_words.append((idx, word.lower(), pos))
     
     if not content_words:
         return [query]
@@ -110,26 +112,38 @@ def expand_query_keywords(query: str, max_synonyms: int = 2) -> list[str]:
     variations = [query]  # Always include original
     
     # Generate synonym-substituted queries
-    # Strategy: For each content word, create a variation with its synonyms
-    for word, pos in content_words[:4]:  # Limit to first 4 words for speed
+    # For each content word, create ONE variation with its primary synonym
+    for token_idx, word, pos in content_words[:4]:  # Limit to first 4 for speed
+        # Get synsets for this specific POS
         synsets = wn.synsets(word, pos=pos)
         if not synsets:
             continue
         
-        # Collect synonyms from top 2 synsets
-        synonyms = set()
-        for synset in synsets[:2]:
-            for lemma in synset.lemmas()[:max_synonyms]:
-                synonym = lemma.name().replace('_', ' ')
-                if synonym.lower() != word and len(synonym) > 2:
-                    synonyms.add(synonym.lower())
+        # FIXED Issue #2: Get primary synonym directly (deterministic)
+        # synsets[0] = most common sense, lemmas()[0] = most common lemma
+        primary_lemma = synsets[0].lemmas()[0]
+        primary_synonym = primary_lemma.name()
         
-        if synonyms:
-            # Create variation: replace word with top synonym in the query
-            top_synonym = list(synonyms)[0]
-            variation = query.replace(word, top_synonym, 1)
-            if variation != query:
-                variations.append(variation)
+        # FIXED Issue #3: Sanitize underscores from multi-word lemmas
+        primary_synonym = primary_synonym.replace('_', ' ')
+        
+        # Skip if synonym is same as original word
+        if primary_synonym.lower() == word:
+            continue
+        
+        # FIXED Issue #1: Token-level replacement (not substring replacement)
+        # Create new token list with synonym at exact index
+        new_tokens = tokens.copy()
+        new_tokens[token_idx] = primary_synonym
+        
+        # Reconstruct query from tokens
+        variation = ' '.join(new_tokens)
+        
+        # Clean up punctuation spacing (word_tokenize separates punctuation)
+        variation = variation.replace(' .', '.').replace(' ,', ',').replace(' ?', '?')
+        
+        if variation != query:
+            variations.append(variation)
     
     return variations
 
