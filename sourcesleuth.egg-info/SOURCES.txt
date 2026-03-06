@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+sourcesleuth.egg-info/PKG-INFO
+sourcesleuth.egg-info/SOURCES.txt
+sourcesleuth.egg-info/dependency_links.txt
+sourcesleuth.egg-info/entry_points.txt
+sourcesleuth.egg-info/requires.txt
+sourcesleuth.egg-info/top_level.txt
+src/__init__.py
+src/mcp_server.py
+src/pdf_processor.py
+src/vector_store.py
+tests/test_mcp_server.py
+tests/test_pdf_processor.py
+tests/test_vector_store.py

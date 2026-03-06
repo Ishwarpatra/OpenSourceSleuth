@@ -1,0 +1,2 @@
+[console_scripts]
+sourcesleuth = src.mcp_server:main
