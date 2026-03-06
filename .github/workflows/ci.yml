@@ -77,6 +77,10 @@ jobs:
           pip install -e ".[dev,ui,ocr]"
           python -m nltk.downloader wordnet averaged_perceptron_tagger punkt punkt_tab omw-1.4
 
+      - name: Install coverage tools
+        run: |
+          pip install pytest-cov>=4.1.0
+
       - name: Show Installed Packages
         run: |
           pip list
