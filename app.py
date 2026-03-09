@@ -180,17 +180,17 @@ st.markdown("""
     * { font-family: 'Inter', sans-serif; }
 
     .main {
-        background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 100%);
-        color: #e0e0e0;
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a0a0a 40%, #2a1a0a 100%);
+        color: #f0f0f0;
     }
 
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a2e 0%, #0f0c29 100%);
-        border-right: 1px solid rgba(99, 102, 241, 0.15);
+        background: linear-gradient(180deg, #1a0a0a 0%, #0a0a0a 100%);
+        border-right: 1px solid rgba(255, 50, 50, 0.15);
     }
 
     [data-testid="stSidebar"] * {
-        color: #c5c5d2 !important;
+        color: #f5d5c5 !important;
     }
 
     /* Hide Streamlit branding */
@@ -202,7 +202,7 @@ st.markdown("""
     .hero-title {
         font-size: 2.8rem;
         font-weight: 800;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        background: linear-gradient(135deg, #ff3333 0%, #ff6600 50%, #ffcc00 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -212,7 +212,7 @@ st.markdown("""
 
     .hero-subtitle {
         font-size: 1.05rem;
-        color: #8b8b9e;
+        color: #c5a595;
         font-weight: 400;
         margin-bottom: 2rem;
         letter-spacing: 0.01em;
@@ -227,8 +227,8 @@ st.markdown("""
     }
 
     .stat-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(99, 102, 241, 0.12);
+        background: rgba(255, 50, 50, 0.05);
+        border: 1px solid rgba(255, 50, 50, 0.2);
         border-radius: 16px;
         padding: 1.5rem;
         text-align: center;
@@ -237,16 +237,16 @@ st.markdown("""
     }
 
     .stat-card:hover {
-        border-color: rgba(99, 102, 241, 0.35);
-        background: rgba(99, 102, 241, 0.06);
+        border-color: rgba(255, 100, 50, 0.5);
+        background: rgba(255, 50, 50, 0.1);
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.08);
+        box-shadow: 0 8px 25px rgba(255, 50, 50, 0.15);
     }
 
     .stat-value {
         font-size: 2.2rem;
         font-weight: 700;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: linear-gradient(135deg, #ff3333, #ffcc00);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -255,7 +255,7 @@ st.markdown("""
 
     .stat-label {
         font-size: 0.8rem;
-        color: #6b6b80;
+        color: #a58575;
         font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.08em;
@@ -264,8 +264,8 @@ st.markdown("""
 
     /* Citation result card */
     .result-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(99, 102, 241, 0.12);
+        background: rgba(255, 50, 50, 0.05);
+        border: 1px solid rgba(255, 50, 50, 0.2);
         border-left: 4px solid;
         border-radius: 16px;
         padding: 1.8rem;
@@ -275,14 +275,14 @@ st.markdown("""
     }
 
     .result-card:hover {
-        border-color: rgba(99, 102, 241, 0.3);
-        background: rgba(99, 102, 241, 0.04);
-        box-shadow: 0 8px 30px rgba(99, 102, 241, 0.06);
+        border-color: rgba(255, 100, 50, 0.4);
+        background: rgba(255, 50, 50, 0.08);
+        box-shadow: 0 8px 30px rgba(255, 50, 50, 0.1);
     }
 
-    .result-card.high { border-left-color: #10b981; }
-    .result-card.medium { border-left-color: #f59e0b; }
-    .result-card.low { border-left-color: #ef4444; }
+    .result-card.high { border-left-color: #ff3333; }
+    .result-card.medium { border-left-color: #ff9900; }
+    .result-card.low { border-left-color: #ffcc00; }
 
     .result-header {
         display: flex;
@@ -294,7 +294,7 @@ st.markdown("""
     .result-filename {
         font-size: 1.1rem;
         font-weight: 600;
-        color: #c5c5e0;
+        color: #f5d5c5;
     }
 
     .result-badge {
@@ -307,27 +307,27 @@ st.markdown("""
         letter-spacing: 0.05em;
     }
 
-    .badge-high { background: rgba(16, 185, 129, 0.12); color: #10b981; }
-    .badge-medium { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
-    .badge-low { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+    .badge-high { background: rgba(255, 50, 50, 0.15); color: #ff3333; }
+    .badge-medium { background: rgba(255, 150, 50, 0.15); color: #ff9900; }
+    .badge-low { background: rgba(255, 200, 50, 0.15); color: #ffcc00; }
 
     .result-context {
         font-size: 0.92rem;
-        color: #9b9bb0;
+        color: #d5b5a5;
         line-height: 1.7;
         font-style: italic;
         padding: 1rem;
-        background: rgba(0, 0, 0, 0.15);
+        background: rgba(0, 0, 0, 0.2);
         border-radius: 10px;
         margin: 0.8rem 0;
-        border-left: 3px solid rgba(99, 102, 241, 0.2);
+        border-left: 3px solid rgba(255, 100, 50, 0.3);
     }
 
     .result-meta {
         display: flex;
         gap: 1.5rem;
         font-size: 0.82rem;
-        color: #6b6b80;
+        color: #a58575;
         margin-top: 0.6rem;
     }
 
@@ -339,10 +339,10 @@ st.markdown("""
 
     /* Search input area */
     .stTextArea textarea {
-        background: rgba(255, 255, 255, 0.04) !important;
-        border: 1px solid rgba(99, 102, 241, 0.2) !important;
+        background: rgba(255, 50, 50, 0.05) !important;
+        border: 1px solid rgba(255, 100, 50, 0.3) !important;
         border-radius: 12px !important;
-        color: #e0e0e0 !important;
+        color: #f0f0f0 !important;
         font-family: 'Inter', sans-serif !important;
         font-size: 0.95rem !important;
         padding: 1rem !important;
@@ -350,18 +350,18 @@ st.markdown("""
     }
 
     .stTextArea textarea:focus {
-        border-color: rgba(99, 102, 241, 0.5) !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08) !important;
+        border-color: rgba(255, 150, 50, 0.6) !important;
+        box-shadow: 0 0 0 3px rgba(255, 100, 50, 0.1) !important;
     }
 
     .stTextArea textarea::placeholder {
-        color: #4a4a5e !important;
+        color: #6a5a50 !important;
     }
 
     /* Buttons */
     .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
+        background: linear-gradient(135deg, #ff3333 0%, #ff6600 100%) !important;
+        color: #0a0a0a !important;
         border: none !important;
         border-radius: 12px !important;
         font-weight: 600 !important;
@@ -369,35 +369,35 @@ st.markdown("""
         font-size: 0.95rem !important;
         letter-spacing: 0.02em !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25) !important;
+        box-shadow: 0 4px 15px rgba(255, 50, 50, 0.3) !important;
     }
 
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35) !important;
+        box-shadow: 0 6px 20px rgba(255, 100, 50, 0.4) !important;
     }
 
     /* Section headers */
     .section-header {
         font-size: 1.3rem;
         font-weight: 600;
-        color: #d0d0e0;
+        color: #f5d5c5;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+        border-bottom: 1px solid rgba(255, 100, 50, 0.2);
     }
 
     /* Examples styling */
     .example-card {
-        background: rgba(99, 102, 241, 0.04);
-        border: 1px dashed rgba(99, 102, 241, 0.15);
+        background: rgba(255, 100, 50, 0.05);
+        border: 1px dashed rgba(255, 100, 50, 0.2);
         border-radius: 12px;
         padding: 1.5rem;
         margin-top: 1rem;
     }
 
     .example-item {
-        color: #8b8ba5;
+        color: #c5a595;
         font-style: italic;
         padding: 0.5rem 0;
         font-size: 0.9rem;
@@ -407,15 +407,15 @@ st.markdown("""
     /* Footer */
     .app-footer {
         text-align: center;
-        color: #4a4a5e;
+        color: #6a5a50;
         font-size: 0.8rem;
         padding: 2rem 0;
-        border-top: 1px solid rgba(99, 102, 241, 0.08);
+        border-top: 1px solid rgba(255, 100, 50, 0.1);
         margin-top: 3rem;
     }
 
     .app-footer a {
-        color: #667eea;
+        color: #ff6600;
         text-decoration: none;
     }
 
@@ -425,16 +425,16 @@ st.markdown("""
 
     /* Sidebar specific */
     [data-testid="stSidebar"] .stButton > button {
-        background: rgba(99, 102, 241, 0.08) !important;
-        border: 1px solid rgba(99, 102, 241, 0.2) !important;
+        background: rgba(255, 50, 50, 0.1) !important;
+        border: 1px solid rgba(255, 100, 50, 0.3) !important;
         box-shadow: none !important;
         font-size: 0.85rem !important;
         padding: 0.6rem 1rem !important;
     }
 
     [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(99, 102, 241, 0.15) !important;
-        border-color: rgba(99, 102, 241, 0.3) !important;
+        background: rgba(255, 50, 50, 0.2) !important;
+        border-color: rgba(255, 150, 50, 0.4) !important;
     }
 
     /* Sliders */
@@ -444,18 +444,18 @@ st.markdown("""
 
     /* File uploader */
     [data-testid="stFileUploader"] {
-        border-color: rgba(99, 102, 241, 0.15) !important;
+        border-color: rgba(255, 100, 50, 0.2) !important;
     }
 
     /* Expander */
     .streamlit-expanderHeader {
-        background: rgba(255, 255, 255, 0.02) !important;
+        background: rgba(255, 50, 50, 0.05) !important;
         border-radius: 8px !important;
     }
 
     /* Dividers */
     hr {
-        border-color: rgba(99, 102, 241, 0.08) !important;
+        border-color: rgba(255, 100, 50, 0.15) !important;
     }
 
     /* Success/Warning/Error messages */
@@ -471,8 +471,8 @@ st.markdown("""
 
     /* Animated glow on search */
     @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
-        50% { box-shadow: 0 0 20px 5px rgba(99, 102, 241, 0.1); }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 100, 50, 0); }
+        50% { box-shadow: 0 0 20px 5px rgba(255, 100, 50, 0.15); }
     }
 
     .search-active {
